@@ -109,13 +109,20 @@ class KB:
     # ── 그래프 만들기 (화면과 같은 규칙) ──
     def _build(self):
         D = self.D
-        self.ENT, self.ENTS = {}, defaultdict(list)
+        self.DIS = {r["kcd"]: r for r in self.table("disease")}
+        # 병명: KCD 4자리 아래 MONDO 질병. 한국어 이름이 코드 이름과 똑같은 병명(담관염 = K83.0 담관염)은 코드와 같은 병이라
+        # 그래프에서 코드 노드 하나로 합친다 (SAME). ENTS 에는 이름이 다른 병명만 둔다. 화면과 같은 규칙
+        self.ENT, self.ENTS, self.SAME, self.ENT_SAME = {}, defaultdict(list), set(), defaultdict(list)
+        norm = lambda z: re.sub(r"\s+", "", z or "")
         for r in self.table("kcd_entity"):
             k = r["kcd"] + "@" + r["mondo_id"]
             self.ENT[k] = {"kcd": r["kcd"], "mondo": r["mondo_id"], "ko": r["name_ko"], "en": r["name_en"],
                            "name_src": r["name_src"], "method": r["method"]}
-            self.ENTS[r["kcd"]].append(k)
-        self.DIS = {r["kcd"]: r for r in self.table("disease")}
+            if norm(r["name_ko"]) == norm(self.DIS.get(r["kcd"], {}).get("name_ko")):
+                self.SAME.add(k)
+                self.ENT_SAME[r["kcd"]].append(k)
+            else:
+                self.ENTS[r["kcd"]].append(k)
         self.FND = {r["id"]: r for r in self.table("finding")}
         self.MEC = {r["id"]: r for r in self.table("mechanism")}
         self.HPO2F = {r["hpo_id"]: r["id"] for r in self.FND.values() if r.get("hpo_id")}
@@ -162,7 +169,7 @@ class KB:
         cols = [c["name"] for c in ep["columns"]]
         for row in ep["rows"]:
             r = dict(zip(cols, row))
-            d, h = "D|" + r["kcd"] + "@" + r["mondo_id"], r["hpo_id"]
+            d, h = "D|" + self.canon(r["kcd"] + "@" + r["mondo_id"]), r["hpo_id"]
             fs = [r[c] for c in ("f_dismech", "f_orphadata", "f_hpoa") if r.get(c) is not None]
             a = dict(src=",".join(r["sources"] or []), f=max(fs) if fs else None, depth=r["min_depth"], deny=r.get("deny_only"),
                      diagnostic=r.get("diagnostic"), freq={k[2:]: r[k] for k in ("f_dismech", "f_orphadata", "f_hpoa") if r.get(k) is not None})
@@ -177,7 +184,7 @@ class KB:
                 add("X|" + i, "manifests_as", self.nid(hp), src="dismech", q="같은 이름의 표현형")
         for mid, m in self.DMm.items():
             for k0, e0, d in dm.get("mondo2kcd", {}).get(m["mondo"], []):
-                k = k0 + "@" + e0
+                k = self.canon(k0 + "@" + e0)
                 if term(mid):
                     if m["depth"] == 1:
                         add("D|" + k, "has_phenotype", self.nid(DMP[mid][0]), src="dismech", depth=d)
@@ -187,7 +194,8 @@ class KB:
                 elif m["depth"] == 1:
                     add("D|" + k, "causes", "X|" + mid, src="dismech", depth=d)
         for k, v in self.ENT.items():
-            add("D|" + k, "subclass_of", "D|" + v["kcd"], src="mondo", q="KCD 분류")
+            if k not in self.SAME:
+                add("D|" + k, "subclass_of", "D|" + v["kcd"], src="mondo", q="KCD 분류")
         for a, bm, bh in dm.get("edges", []):
             a = str(a)
             if bm is not None:
@@ -199,21 +207,25 @@ class KB:
                 add("X|" + a, "manifests_as", self.nid(bh), src="dismech")
         for s, p, o, src, q, conf, basis, depth, tgt, cd, cr, vd in self.fill.get("edges", []):
             add(self.nid(s), p, self.nid(o), src=src, q=q, conf=conf, basis=basis or (q if src == "orphanet_go" else ""),
-                depth=depth or 0, fill="B" if src == "claude_mech" else "A", tgt=tgt, review=vd)
+                depth=depth or 0, fill="B" if src == "claude_mech" else "A", tgt=tgt and self.canon(tgt), review=vd)
         self._fc = {}
+
+    def canon(self, k):
+        """병명 키 → 그래프 노드 키 (코드 이름과 같은 병명은 그 코드)"""
+        return self.ENT[k]["kcd"] if k in self.SAME else k
 
     def nid(self, raw):
         """원본 ID(KCD:E14, MONDO:…, HP:…, SKKU:F:…, DM:…, HGNC:…, GO:…, CDM:…, LOINC:…) → 그래프 노드 ID"""
         if not raw:
             return None
         if raw.startswith("D|"):
-            return raw
+            return "D|" + self.canon(raw[2:])
         ns, _, v = raw.partition(":")
         if ns == "KCD":
             return "D|" + v.replace(".", "")[:4]
         if ns == "MONDO":
             k = self.MONDO2KCD.get(raw)
-            return ("D|" + (k + "@" + raw if k + "@" + raw in self.ENT else k)) if k else None
+            return ("D|" + (self.canon(k + "@" + raw) if k + "@" + raw in self.ENT else k)) if k else None
         if ns == "HP":
             return "F|" + self.HPO2F[raw] if raw in self.HPO2F else "H|" + raw
         if ns == "SKKU":
@@ -263,11 +275,11 @@ class KB:
     def _id(self, i):
         i = str(i).strip()
         if len(i) > 1 and i[1] == "|":
-            return i
+            return "D|" + self.canon(i[2:]) if i[0] == "D" else i
         if i.startswith("HP:"):
             return self.nid(i)
         if "@" in i or re.match(r"^[A-Z]\d\d", i):
-            return "D|" + i.replace(".", "")
+            return "D|" + self.canon(i.replace(".", "") if "@" not in i else i.split("@")[0].replace(".", "") + "@" + i.split("@", 1)[1])
         return i
 
     def _ok(self, e, sub=True, fill=True, hypotheses=False):
@@ -334,6 +346,7 @@ class KB:
         return {"id": i, "code": k, "name": r.get("name_ko"), "en": r.get("name_en"), "chapter": r.get("chapter"),
                 "parent": r.get("parent"), "children": kids, "inclusions": r.get("inclusions_ko") or [],
                 "names": [{"id": "D|" + e, **{x: self.ENT[e][x] for x in ("ko", "en", "mondo", "name_src", "method")}} for e in self.ENTS.get(k, [])],
+                "same_as_code": [{x: self.ENT[e][x] for x in ("ko", "en", "mondo", "name_src", "method")} for e in self.ENT_SAME.get(k, [])],  # 코드와 같은 병명 (그래프에서는 코드 노드)
                 "schemas": sorted(self.SKREF.get(i, set()) | self.SKREF.get("D|" + k, set()))}
 
     def phenotypes(self, name_key, sub=True):
@@ -414,10 +427,11 @@ class KB:
         present·absent: HPO ID(HP:…) 또는 노드 ID(F|…·H|…)"""
         P = {self._id(x) for x in present}
         A = {self._id(x) for x in absent}
-        cands = list(self.ENT) + [k for k in self.DIS if len(k) <= 4 and not self.ENTS.get(k) and self.GO.get("D|" + k)]
+        # 후보: 이름이 다른 병명 + 코드 자체(병명이 없거나, 코드와 같은 병명을 합친 코드). 코드는 그 코드 노드에서 닿는 소견만 센다
+        cands = [k for k in self.ENT if k not in self.SAME] + [k for k in self.DIS if len(k) <= 4 and (not self.ENTS.get(k) or k in self.ENT_SAME) and self.GO.get("D|" + k)]
         out = []
         for k in cands:
-            fs = self.findings_of("D|" + k)
+            fs = self.findings_of("D|" + k) if "@" in k else {n for n in self._reach_ids("D|" + k) if n[0] in "FH"}
             hit, miss = fs & P, fs & A
             if hit:
                 out.append({"id": "D|" + k, "name": self.node("D|" + k)["name"], "matched": len(hit), "conflicts": len(miss),
