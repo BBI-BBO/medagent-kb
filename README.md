@@ -82,7 +82,7 @@ OpenAI 호환 API 는 `{"type": "function", "function": {"name": t["name"], "des
 
 그래프는 계속 고쳐집니다 (병명 자리·번역·기전 채우기·출처 갱신). 그래서 판마다 이름을 붙이고, 지난 판도 그대로 보관합니다.
 
-- **판 이름**: `kb-YYYY.MM.DD.N` (그날 N번째 배포). 화면 'DB 정보'와 `version.json`에 나옵니다.
+- **판 이름**: `kb-YYYY.MM.DD.N` (그날 N번째 판). 화면 'DB 정보'와 `version.json`에 나옵니다. 자료가 바뀔 때만 새 판을 만들고, 화면만 고친 배포는 판 이름이 그대로입니다 (`version.json`의 `data_sha256`이 자료 지문).
 - **최신판**: `https://bbi-bbo.github.io/medagent-kb/` — 배포하면 바로 바뀝니다. `KB()`.
 - **고정 판**: `https://github.com/BBI-BBO/medagent-kb/releases/download/<판>/data.js` 처럼 Release 자산으로 보관하고 **바꾸지 않습니다**. `KB(version="<판>")`.
 - **실험·평가·대회 제출에는 판을 고정하세요.** 같은 질문에 같은 답이 나와야 결과를 비교할 수 있습니다. 결과를 기록할 때 `kb.version`을 함께 남기세요.
