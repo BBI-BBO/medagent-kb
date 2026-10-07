@@ -1,0 +1,2221 @@
+<title>의료 agent 지식 DB</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cellipse cx='12' cy='6' rx='8' ry='3' fill='%232a78d6'/%3E%3Cpath d='M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3' fill='none' stroke='%232a78d6' stroke-width='2'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..24,400,0..1,0&icon_names=account_tree,ads_click,arrow_back,arrow_forward,check,chevron_left,chevron_right,close,database,expand_more,filter_alt,filter_list,first_page,fit_screen,help,info,key,keyboard,last_page,legend_toggle,link,menu,mouse,open_in_full,pan_tool,push_pin,remove,schema,search,stethoscope,swap_horiz,swap_vert,table_rows,touch_app,tune,undo,view_list,visibility,width_full,zoom_in,zoom_out&display=block">
+<style>
+@font-face{font-family:"Pretendard Variable";font-weight:45 920;font-style:normal;font-display:swap;src:url("fonts/PretendardVariable.woff2") format("woff2-variations"),url("fonts/PretendardVariable.woff2") format("woff2")}  /* Pretendard 1.3.9 · SIL OFL 1.1 (fonts/LICENSE.txt) */
+/* 레이아웃: 위쪽 앱 바(이름 · 탭 · DB 정보) + 탭 화면. 관계 그래프는 왼쪽 목록 | 오른쪽 상세(높이가 일정한 머리말 → 그래프). 의료 agent 현황판(viz/template.html)과 같은 색 토큰 */
+:root{
+  color-scheme:light;
+  --page:#f9f9f7; --surface:#fcfcfb; --surface-2:#f0efec; --ink:#0b0b0b; --ink-2:#52514e; --muted:#898781;
+  --grid:#e1e0d9; --axis:#c3c2b7; --ring:rgba(11,11,11,0.10);
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#7a6fd0; --s5:#b07a1e; --s5-wash:rgba(176,122,30,.12);
+  --s1-wash:rgba(42,120,214,.10); --s2-wash:rgba(235,104,52,.10); --s3-wash:rgba(27,175,122,.12); --s4-wash:rgba(122,111,208,.12);
+  --sel:#fff4c2; --edge:#b9b8af;
+  --font:"Pretendard Variable",Pretendard,system-ui,-apple-system,"Segoe UI","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,"D2Coding",monospace;
+  --bar-h:52px; --r:8px; --shadow:0 6px 24px rgba(11,11,11,.12),0 1px 3px rgba(11,11,11,.08);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  color-scheme:dark;
+  --page:#0d0d0d; --surface:#1a1a19; --surface-2:#262624; --ink:#ffffff; --ink-2:#c3c2b7; --muted:#898781;
+  --grid:#2c2c2a; --axis:#383835; --ring:rgba(255,255,255,0.10);
+  --s1:#3987e5; --s2:#e2703f; --s3:#22b884; --s4:#958ae6; --s5:#d29a3c; --s5-wash:rgba(210,154,60,.18);
+  --s1-wash:rgba(57,135,229,.18); --s2-wash:rgba(226,112,63,.18); --s3-wash:rgba(34,184,132,.18); --s4-wash:rgba(149,138,230,.20);
+  --sel:#3a3418; --edge:#55544f;
+}}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --page:#0d0d0d; --surface:#1a1a19; --surface-2:#262624; --ink:#ffffff; --ink-2:#c3c2b7; --muted:#898781;
+  --grid:#2c2c2a; --axis:#383835; --ring:rgba(255,255,255,0.10);
+  --s1:#3987e5; --s2:#e2703f; --s3:#22b884; --s4:#958ae6; --s5:#d29a3c; --s5-wash:rgba(210,154,60,.18);
+  --s1-wash:rgba(57,135,229,.18); --s2-wash:rgba(226,112,63,.18); --s3-wash:rgba(34,184,132,.18); --s4-wash:rgba(149,138,230,.20);
+  --sel:#3a3418; --edge:#55544f;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{background:var(--page)}
+body{margin:0;color:var(--ink);font:15px/1.55 var(--font);padding-inline:16px;padding-block:0 48px}
+.wrap{max-width:1400px;margin:0 auto}
+.ms{font-family:"Material Symbols Outlined";font-weight:normal;font-style:normal;font-size:20px;line-height:1;letter-spacing:normal;text-transform:none;display:inline-block;white-space:nowrap;direction:ltr;-webkit-font-smoothing:antialiased;font-feature-settings:"liga";overflow:hidden;width:1em;flex:none;user-select:none}
+/* 앱 바 */
+/* 앱 바는 맨 위에 고정, 사이드바는 그 아래 왼쪽 끝에 고정 (관계 그래프 · 테이블 탭) */
+:root{--side-w:320px}
+body{padding-top:var(--bar-h)}
+.appbar{position:fixed;top:0;left:0;right:0;z-index:40;background:var(--page);border-bottom:1px solid var(--grid);padding:env(safe-area-inset-top,0px) 16px 0}
+.appbar .in{height:var(--bar-h);display:flex;align-items:center;gap:16px}
+.sidebtn{border:0;background:none;width:36px;height:36px;border-radius:50%;display:inline-flex;visibility:hidden;align-items:center;justify-content:center;cursor:pointer;color:var(--ink-2);margin-left:-6px;flex:none}
+.sidebtn:hover{background:var(--surface-2);color:var(--ink)}
+body.side-on .sidebtn{visibility:visible}  /* 사이드바가 없는 탭에서도 자리는 남겨 탭 위치가 움직이지 않게 */
+.sidebar{position:fixed;top:calc(env(safe-area-inset-top,0px) + var(--bar-h));left:0;bottom:0;width:var(--side-w);background:var(--surface);border-right:1px solid var(--grid);z-index:35;display:none;flex-direction:column}
+body.side-on:not(.side-collapsed) .sidebar{display:flex}
+body.side-on:not(.side-collapsed){padding-left:calc(var(--side-w) + 24px)}
+.sidepane{display:flex;flex-direction:column;gap:8px;padding:12px 12px 0;min-height:0;flex:1}
+.sidepane #xlist,.sidepane .tree{flex:1;min-height:0;max-height:none;border:0;border-top:1px solid var(--grid);border-radius:0;margin:0 -12px;background:transparent}
+.sidescrim{position:fixed;inset:0;background:rgba(11,11,11,.32);z-index:34}
+@media (max-width:900px){
+  body.side-on:not(.side-collapsed){padding-left:16px}
+  body.side-on .sidebar{display:flex;transform:translateX(-100%);transition:transform .18s ease;box-shadow:var(--shadow);width:min(var(--side-w),88vw)}
+  body.side-open .sidebar{transform:none}
+}
+.brand{display:flex;align-items:center;gap:8px;font-weight:600;font-size:16px;white-space:nowrap}
+.brand .ms{color:var(--s1);font-size:22px}
+.snap{margin-left:auto;display:inline-flex;align-items:center;gap:6px;border:1px solid var(--ring);background:var(--surface);border-radius:999px;height:32px;padding:0 12px 0 9px;cursor:pointer;font-size:13px;color:var(--ink-2);white-space:nowrap}
+.snap:hover{border-color:var(--axis);color:var(--ink)}
+.snap .ms{font-size:18px}
+@media (max-width:760px){.brand b{display:none}.snap .t{display:none}.snap{padding:0 7px}}
+/* 팝오버 (자세히 · 필터 · 범례 · 도움말 · DB 정보) */
+.pop{position:fixed;z-index:60;background:var(--surface);color:var(--ink);border:1px solid var(--ring);border-radius:10px;box-shadow:var(--shadow);padding:14px 16px;max-width:min(560px,calc(100vw - 24px));max-height:min(70vh,640px);overflow:auto;font-size:14px}
+.pop h4{margin:0 0 8px;font-size:13px;color:var(--ink-2);font-weight:600;letter-spacing:.02em}
+.pop .row{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 0 8px}
+.pop label{display:flex;gap:8px;align-items:center;padding:5px 0;cursor:pointer}
+.pop p{margin:0 0 8px;color:var(--ink-2);line-height:1.6}
+.pop .blegend{flex-direction:column;gap:6px;margin:0}
+.srcl{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;font-size:13px}
+.help{display:flex;flex-direction:column;gap:2px;min-width:min(440px,80vw)}
+.help h4{margin:10px 0 4px} .help h4:first-child{margin-top:0}
+.help .hr{display:grid;grid-template-columns:24px minmax(0,1.1fr) minmax(0,1.3fr);gap:10px;align-items:center;padding:5px 0;border-bottom:1px solid var(--grid)}
+.help .hr .ms{color:var(--s1);font-size:20px}
+.help .how{font-weight:500;font-size:13.5px}
+.help .what{color:var(--ink-2);font-size:13px}
+kbd{font-family:var(--mono);font-size:11.5px;border:1px solid var(--axis);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--surface-2);color:var(--ink);white-space:nowrap}
+/* 가장자리 툴팁 (간선 출처) */
+.etip{position:fixed;z-index:70;pointer-events:none;background:var(--ink);color:var(--page);border-radius:6px;padding:5px 9px;font-size:12px;line-height:1.45;max-width:320px;box-shadow:var(--shadow)}
+.etip b{font-weight:600}
+.ntip{position:fixed;z-index:70;pointer-events:none;background:var(--surface);color:var(--ink);border:1px solid var(--axis);border-radius:8px;box-shadow:var(--shadow);padding:6px 12px 6px 14px;max-width:280px;font-size:13px;line-height:1.45;display:flex;flex-direction:column;gap:1px}
+.ntip b{font-size:14px;font-weight:600}
+.ntip span{font-size:12px;color:var(--ink-2)} .ntip .e{color:var(--muted)}
+.ntip.k-D{box-shadow:inset 3px 0 0 var(--s2),var(--shadow)} .ntip.k-F,.ntip.k-H{box-shadow:inset 3px 0 0 var(--s3),var(--shadow)} .ntip.k-M,.ntip.k-X,.ntip.k-C{box-shadow:inset 3px 0 0 var(--s4),var(--shadow)} .ntip.k-A,.ntip.k-T,.ntip.k-G{box-shadow:inset 3px 0 0 var(--s1),var(--shadow)} .ntip.k-P{box-shadow:inset 3px 0 0 var(--s5),var(--shadow)}
+.etip span{opacity:.75;display:block}
+h1{font-size:22px;margin:0 0 2px;text-wrap:balance}
+h2{font-size:16px;margin:0 0 4px}
+.sub{color:var(--ink-2);margin:0}
+.muted{color:var(--muted)}
+code,.mono{font-family:var(--mono);font-size:12.5px}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--s1);outline-offset:2px}
+
+.stats{display:flex;flex-wrap:wrap;gap:8px 32px;margin:14px 0 4px}
+.stat small{white-space:nowrap}
+.stat b{display:block;font-size:20px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.2}
+.stat span{font-size:12px;color:var(--ink-2)}
+.stat small{display:block;font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.progress{height:4px;background:var(--surface-2);border-radius:2px;overflow:hidden;margin-top:4px;width:120px}
+.progress i{display:block;height:100%;background:var(--s2)}
+
+.tabs{display:flex;gap:2px;align-self:stretch;overflow-x:auto;scrollbar-width:none;min-width:0}
+.tabs button{border:0;background:none;color:var(--ink-2);padding:0 12px;cursor:pointer;border-bottom:2px solid transparent;border-top:2px solid transparent;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;font-size:14.5px}
+.tabs button .ms{font-size:19px}
+.tabs button:hover{color:var(--ink)}
+.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--s1);font-weight:600}
+.tabs button[aria-selected="true"] .ms{color:var(--s1)}
+section{padding-top:18px}
+
+/* 레이어 색 */
+.L-원문{--lc:var(--muted);--lw:var(--surface-2)}
+.L-정규화{--lc:var(--s2);--lw:var(--s2-wash)} .L-출처{--lc:var(--s1);--lw:var(--s1-wash)} .L-통합{--lc:var(--s3);--lw:var(--s3-wash)} .L-보조{--lc:var(--s5);--lw:var(--s5-wash)}
+
+/* 구조 */
+.badge{font-size:11px;border-radius:999px;padding:0 7px;background:var(--lw);color:var(--ink-2);white-space:nowrap}
+
+/* 구조 (ERD) */
+.legend{display:flex;flex-wrap:wrap;gap:6px 20px;font-size:12px;color:var(--ink-2);margin:0 0 6px;align-items:center}
+.legend span{display:inline-flex;gap:6px;align-items:center}
+.key{font-size:10px;font-weight:700;border-radius:3px;padding:0 3px;line-height:15px}
+.key.pk{background:var(--sel);color:var(--ink)}
+.erdwrap{overflow-x:auto;border:1px solid var(--ring);border-radius:10px;background:var(--surface);min-width:0}
+.erdsvg{display:block} .erdsvg text{user-select:none;-webkit-user-select:none}
+.erdsvg text{font-family:var(--font);fill:var(--ink)}
+.erdsvg .colh{font-size:12px;font-weight:600;letter-spacing:.06em;fill:var(--lc)}
+.erdsvg .ent{cursor:pointer}
+.erdsvg .ent .body{fill:var(--surface);stroke:var(--axis);stroke-width:1}
+.erdsvg .ent .head{fill:var(--lw)}
+.erdsvg .ent .strip{fill:var(--lc)}
+.erdsvg .ent .tn{font-family:var(--mono);font-size:12.5px;font-weight:700}
+.erdsvg .ent .tc{font-size:11.5px;fill:var(--ink-2);font-variant-numeric:tabular-nums}
+.erdsvg .ent .mv{font-size:10px;fill:var(--ink-2)}
+.erdsvg .ent .mvb{fill:var(--surface);stroke:var(--lc)}
+.erdsvg .ent .cn{font-family:var(--mono);font-size:11.5px}
+.erdsvg .ent .ct{font-size:10.5px;fill:var(--muted)}
+.erdsvg .ent .sep{stroke:var(--grid)}
+.erdsvg .ent .kpk{fill:var(--sel);stroke:var(--axis)}
+.erdsvg .ent .kfk{fill:var(--lw);stroke:var(--axis)}
+.erdsvg .ent .kt{font-size:8.5px;font-weight:700;fill:var(--ink-2)}
+.erdsvg .ent .pkrow .cn{font-weight:700}
+.erdsvg .ent:hover .body,.erdsvg .ent:focus .body,.erdsvg .ent.lit .body{stroke:var(--lc);stroke-width:1.5}
+.erdsvg .rel path{fill:none;stroke:var(--axis);stroke-width:1.2}
+.erdsvg .rel circle{fill:var(--surface);stroke:var(--axis);stroke-width:1.2}
+.erdsvg .rel.virtual .ln{stroke-dasharray:4 3}
+.erdsvg .rel.hot path,.erdsvg .rel.hot circle{stroke:var(--s2);stroke-width:1.8}
+.erdsvg.dim .ent:not(.lit){opacity:.35}
+.erdsvg.dim .rel:not(.hot){opacity:.15}
+
+/* 테이블 (DataGrip 풍): 왼쪽 트리 · 머리 · 격자 · 행 상세 */
+.dbx{display:block}
+@media (max-width:900px){.dbx{grid-template-columns:minmax(0,1fr)}}
+.dbtree{position:sticky;top:calc(env(safe-area-inset-top,0px) + var(--tabs-h,52px) + 10px);display:flex;flex-direction:column;gap:8px;min-width:0}
+@media (max-width:900px){.dbtree{position:static}}
+.search.sm{height:34px;padding:0 8px}
+.search.sm input{font-size:13.5px!important}
+.search.sm .ms{font-size:18px}
+.tree{border:1px solid var(--ring);border-radius:var(--r);background:var(--surface);max-height:calc(100vh - var(--tabs-h,52px) - 110px);overflow:auto;padding:4px 0;font-size:13.5px}
+@media (max-width:900px){.tree{max-height:240px}}
+.tree details.tg>summary{list-style:none;display:flex;align-items:center;gap:4px;padding:5px 10px 5px 6px;cursor:pointer;color:var(--ink-2);font-weight:600;font-size:12.5px;letter-spacing:.02em;user-select:none}
+.tree details.tg>summary::-webkit-details-marker{display:none}
+.tree details.tg>summary .ms{font-size:18px;color:var(--muted);transition:transform .12s}
+.tree details.tg[open]>summary .ms{transform:rotate(90deg)}
+.tree details.tg>summary .lt{flex:1;display:flex;align-items:center;gap:6px}
+.tree details.tg>summary .lt::before{content:"";width:7px;height:7px;border-radius:2px;background:var(--lc)}
+.tree .n{font-family:var(--mono);font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums;font-weight:400}
+.tree .ti{display:flex;align-items:center;gap:6px;width:100%;border:0;background:none;padding:3px 10px 3px 26px;cursor:pointer;text-align:left;color:var(--ink);height:28px}
+.tree .ti .ms{font-size:16px;color:var(--lc)}
+.tree .ti .tn{flex:1;min-width:0;font-family:var(--mono);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tree .ti:hover{background:var(--surface-2)}
+.tree .ti[aria-pressed="true"]{background:var(--s1-wash);box-shadow:inset 2px 0 0 var(--s1)}
+.dbmain{min-width:0;display:flex;flex-direction:column;gap:8px}
+.dbhead .th1{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px}
+.dbhead .th1 .ms{color:var(--s1);font-size:22px}
+.dbhead .th1 b{font-size:18px;font-weight:600}
+.dbhead .kind{border:1px solid var(--axis);border-radius:4px;padding:0 6px;font-size:12px;color:var(--ink-2);line-height:20px}
+.dbhead .tcom{font-size:13px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.vtabs{display:flex;gap:2px;border-bottom:1px solid var(--grid);margin-top:8px}
+.vtabs button{border:0;background:none;padding:7px 12px;cursor:pointer;color:var(--ink-2);border-bottom:2px solid transparent;font-size:14px}
+.vtabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--s1);font-weight:600}
+.vtabs .n{font-size:12px;color:var(--muted);font-weight:400;margin-left:4px}
+.fsel{display:inline-flex;align-items:center;gap:0;border:1px solid var(--axis);border-radius:6px;height:34px;overflow:hidden;background:var(--surface);font-size:12.5px}
+.fsel .mono{padding:0 8px;color:var(--ink-2);border-right:1px solid var(--grid);height:100%;display:flex;align-items:center;background:var(--surface-2)}
+.fsel select{border:0!important;border-radius:0!important;height:100%;background:transparent!important;max-width:200px}
+.search.wide{flex:1 1 260px;max-width:380px}
+.chip .ms{font-size:15px}
+.gridcol{min-width:0}
+/* 격자 */
+.tablewrap.dg{border-radius:6px;max-height:calc(100vh - var(--tabs-h,52px) - 230px);overflow:auto}
+.dg table{font-family:var(--mono);font-size:12.5px;border-collapse:separate;border-spacing:0;width:max-content;min-width:100%}
+.dg th{position:sticky;top:0;z-index:2;background:var(--surface-2);color:var(--ink);font-weight:500;padding:5px 10px;border-bottom:1px solid var(--axis);border-right:1px solid var(--grid);cursor:pointer;user-select:none;text-align:left;vertical-align:bottom;white-space:nowrap}
+.dg th:hover{background:color-mix(in srgb,var(--surface-2) 70%,var(--axis))}
+.dg th .hc{display:flex;align-items:center;gap:4px}
+.dg th small{display:block;font-size:10.5px;color:var(--muted);font-weight:400;font-family:var(--mono)}
+.dg th .srt{font-size:9px;color:var(--s1)}
+.dg .ms.k{font-size:14px;color:var(--s5)} .dg .ms.l{font-size:14px;color:var(--s1)}
+.dg td{padding:3px 10px;height:27px;border-bottom:1px solid var(--grid);border-right:1px solid var(--grid);white-space:nowrap;max-width:340px;overflow:hidden;text-overflow:ellipsis;vertical-align:middle}
+.dg tbody tr:nth-child(even) td{background:color-mix(in srgb,var(--surface) 92%,var(--surface-2))}
+.dg tbody tr:hover td{background:var(--surface-2)}
+.dg tbody tr,.dg tbody tr.on,.dg tbody tr:hover{background:var(--surface)}
+.dg tbody tr.on td{background:var(--s1-wash)}
+.dg td.rn,.dg th.rn{position:sticky;left:0;z-index:1;background:var(--surface-2);color:var(--muted);text-align:right;min-width:44px;font-size:11.5px;cursor:default}
+.dg th.rn{z-index:3}
+.dg tbody tr.on td.rn{background:var(--s1);color:#fff}
+.dg td.num{text-align:right;color:var(--s1)}
+.dg td.bool{color:var(--s4)}
+.dg .nul{color:var(--muted);font-style:italic;font-size:11.5px}
+.dg td.arrc .br{color:var(--muted)}
+.dg .fkl{color:var(--muted);margin-left:6px;font-family:var(--font);font-size:12px}
+.dg button.fk{font-family:var(--mono)}
+.dg td.ty{color:var(--s4)} .dg td.cm{font-family:var(--font);white-space:normal;max-width:520px;color:var(--ink-2)}
+.dgh{margin:16px 0 6px;font-size:13px;color:var(--ink-2)}
+.pager{justify-content:space-between;flex-wrap:wrap;font-size:13px}
+.pager .pbtns{display:inline-flex;align-items:center;gap:4px}
+.pager .pbtns button{display:inline-flex;align-items:center;justify-content:center;width:30px;height:28px;padding:0}
+.pager .pbtns .pg{min-width:64px;text-align:center;font-family:var(--mono);font-size:12.5px}
+.pager select{font:inherit;font-size:12.5px;border:1px solid var(--ring);border-radius:6px;background:var(--surface);color:var(--ink);height:28px;margin-left:6px}
+.panel .ph button{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;padding:0}
+.panel dl{font-family:var(--mono);font-size:12.5px;gap:5px 12px}
+.panel dt{color:var(--ink-2)}
+.panel button.fk.more{font-size:12.5px;margin-top:2px}
+.pager .colsx{flex:1 1 100%;min-width:0}
+.pager .colsx button.fk{border:0;padding:0;width:auto;height:auto;background:none}
+.tpick{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.tpick button{border:1px solid var(--ring);background:var(--surface);border-radius:999px;padding:3px 10px;cursor:pointer;font-size:12.5px;display:flex;gap:6px;align-items:center}
+.tpick button::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--lc)}
+.tpick button[aria-pressed="true"]{background:var(--ink);color:var(--page);border-color:var(--ink)}
+.tpick .n{font-variant-numeric:tabular-nums;color:var(--muted)}
+.tpick button[aria-pressed="true"] .n{color:inherit;opacity:.7}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
+.toolbar input,.toolbar select{font:inherit;font-size:13px;padding:5px 8px;border:1px solid var(--axis);border-radius:6px;background:var(--surface);color:var(--ink)}
+.toolbar input{min-width:0;flex:1 1 220px;max-width:340px}
+.toolbar label{font-size:12px;color:var(--ink-2);display:flex;gap:4px;align-items:center}
+.chip{display:inline-flex;gap:4px;align-items:center;background:var(--sel);border-radius:999px;padding:1px 4px 1px 9px;font-size:12px}
+.chip button{border:0;background:none;cursor:pointer;padding:0 5px;color:var(--ink-2)}
+.split{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:16px;align-items:start}
+.split.nopanel{grid-template-columns:minmax(0,1fr)}
+@media (max-width:1000px){.split{grid-template-columns:minmax(0,1fr)}}
+.tablewrap{overflow-x:auto;border:1px solid var(--ring);border-radius:10px;background:var(--surface);min-width:0}
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+th{font-weight:500;color:var(--ink-2);text-align:left;padding:6px 8px;border-bottom:1px solid var(--axis);white-space:nowrap;position:sticky;top:0;background:var(--surface)}
+th small{display:block;color:var(--muted);font-weight:400;font-family:var(--mono);font-size:10.5px}
+td{padding:5px 8px;border-bottom:1px solid var(--grid);vertical-align:top;max-width:340px}
+tbody tr{cursor:pointer}
+tbody tr:hover{background:var(--surface-2)}
+tbody tr.on{background:var(--sel)}
+td.num{text-align:right;font-variant-numeric:tabular-nums}
+.null{color:var(--muted)}
+.arr{display:inline-block;background:var(--surface-2);border-radius:4px;padding:0 5px;margin:1px 2px 1px 0;font-size:11.5px}
+button.fk.dim{color:var(--muted);text-decoration-color:transparent}
+.dmeta button.fk{margin-right:8px}
+a.fk,button.fk{border:0;background:none;padding:0;color:var(--s1);cursor:pointer;text-decoration:underline;text-decoration-color:color-mix(in srgb,var(--s1) 35%,transparent);text-underline-offset:2px;text-align:left;font:inherit}
+.pager{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:8px;font-size:12.5px;color:var(--ink-2)}
+.pager button{border:1px solid var(--ring);background:var(--surface);border-radius:6px;padding:3px 10px;cursor:pointer}
+.pager button:disabled{opacity:.4;cursor:default}
+
+/* 행 패널 */
+.panel{background:var(--surface);border:1px solid var(--ring);border-radius:10px;padding:14px;position:sticky;top:12px;max-height:calc(100vh - 24px);overflow:auto;min-width:0}
+.panel .ph{display:flex;justify-content:space-between;gap:8px;align-items:start}
+.panel .ph button{border:0;background:var(--surface-2);border-radius:6px;cursor:pointer;padding:2px 8px}
+.panel h4{margin:14px 0 6px;font-size:12px;color:var(--ink-2);font-weight:600;letter-spacing:.03em}
+.panel dl{display:grid;grid-template-columns:auto minmax(0,1fr);gap:3px 10px;margin:8px 0 0;font-size:12.5px}
+.panel dt{font-family:var(--mono);color:var(--muted);font-size:11.5px;padding-top:1px}
+.panel dd{margin:0;overflow-wrap:anywhere}
+.reflist{list-style:none;margin:0;padding:0;font-size:12.5px;display:flex;flex-direction:column;gap:3px}
+.reflist li{display:flex;gap:6px;align-items:baseline;min-width:0}
+.reflist .tn{font-family:var(--mono);font-size:11px;color:var(--muted);white-space:nowrap}
+.crumbs{display:flex;flex-direction:column;gap:2px;font-size:12.5px;border-left:2px solid var(--axis);padding-left:10px}
+.crumbs .r{font-size:11px;color:var(--muted);font-family:var(--mono);margin-right:4px}
+.more{font-size:12px;color:var(--muted)}
+
+/* 관계 그래프 */
+.gnote{font-size:12px;color:var(--muted);margin:8px 0 0}
+.teams{display:inline-flex;gap:3px;vertical-align:middle}
+.teams i{width:8px;height:8px;border-radius:50%;background:var(--axis);display:inline-block}
+.teams i.on{background:var(--ink-2)}
+.empty{padding:24px;color:var(--muted);text-align:center}
+
+/* 관계 그래프 */
+.xg .xn.E rect{fill:var(--surface-2);stroke:var(--muted)}
+.xg .xn.T rect,.xg .xn.A rect{fill:var(--s1-wash);stroke:var(--s1)}
+.xg path.p-causes{stroke:var(--ink-2)} .xg path.p-manifest{stroke:var(--s4)} .xg path.p-pheno{stroke:var(--s5)} .xg path.p-pheno.s-skku{stroke:var(--s3)} .xg path.p-test{stroke:var(--s1)} .xg path.p-sub{stroke:var(--axis);stroke-dasharray:1 3}
+.xg path.absent,.xg path.sub{stroke-dasharray:4 3} .xg path.deny{stroke-opacity:.45}
+.xg path.p-const{stroke:var(--s2);stroke-width:1.8} .xg .mk.p-const{fill:var(--s2)} .xg path.shortcut{stroke:var(--s2);stroke-dasharray:6 4}
+tr.hl td{background:var(--s1-wash)} /* 진료 */
+.cgrid{display:grid;grid-template-columns:320px minmax(0,1fr);gap:16px;align-items:start}
+.cexbox{background:var(--surface-2);border-radius:8px;padding:8px 10px;margin:0 0 6px;font-size:12.5px} .cexbox p{margin:0 0 6px} .cexbox summary{cursor:pointer;color:var(--s1)} .clist li.ctruth{background:var(--s1-wash);border-radius:6px;padding-left:6px}
+.cklist{list-style:none;margin:8px 0;padding:0} .cklist li{display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--grid);font-size:13px} .cklist li.absent label{text-decoration:line-through;color:var(--muted)} .cklist .cdel{border:0;background:none;cursor:pointer;color:var(--muted)}
+@media (max-width:900px){.cgrid{grid-template-columns:minmax(0,1fr)}}
+.cpanel{background:var(--surface);border:1px solid var(--ring);border-radius:10px;padding:14px;min-width:0}
+.cpanel h3{margin:0 0 8px;font-size:15px} .cpanel h4{margin:14px 0 6px;font-size:13px}
+.cpanel select,.cpanel input[type=search]{width:100%;box-sizing:border-box;margin:4px 0 10px;padding:7px 9px;border:1px solid var(--axis);border-radius:8px;background:var(--surface);color:var(--ink);font:inherit}
+.cres{max-height:320px;overflow:auto;border-top:1px solid var(--grid)}
+.chit{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:6px 2px;border-bottom:1px solid var(--grid);font-size:13px}
+.chit>div:last-child{display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end}
+.cpanel button.cadd,.cpanel button.cyes,.cpanel button.cno{border:1px solid var(--axis);background:var(--surface);border-radius:6px;padding:2px 8px;font-size:12px;cursor:pointer;color:var(--ink)}
+.cpanel button.cyes{border-color:var(--s3)} .cpanel button.cno{border-color:var(--s2)}
+.cchips{display:flex;flex-wrap:wrap;gap:6px}
+.cchip{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--axis);border-radius:999px;padding:2px 4px 2px 2px;font-size:12.5px}
+.cchip.present{border-color:var(--s3);background:var(--s3-wash)} .cchip.absent{border-color:var(--s2);background:var(--s2-wash);text-decoration:line-through}
+.cchip button{border:0;background:none;cursor:pointer;font-size:11px;color:var(--ink-2)} .cchip .ctog{background:var(--surface);border-radius:999px;padding:1px 6px}
+.clist{list-style:none;margin:0;padding:0} .clist li{border-bottom:1px solid var(--grid);padding:8px 0}
+.crow{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap} .cpct{margin-left:auto;font-variant-numeric:tabular-nums}
+.cevs{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px} .cev{font-size:11.5px;border-radius:5px;padding:1px 6px;background:var(--surface-2)}
+.cev.present{background:var(--s3-wash)} .cev.absent{background:var(--s2-wash)} .cev.none{opacity:.7} .cev i{color:var(--muted);font-style:normal}
+.cev{display:inline-flex;align-items:center;gap:2px} .cev .ms{font-size:14px} .cev.present .ms{color:var(--s3)} .cev.absent .ms{color:var(--s2)} .cev.none .ms{color:var(--muted)}
+.cqs{list-style:none;margin:0;padding:0} .cqs li{border-bottom:1px solid var(--grid);padding:8px 0;display:grid;gap:3px}
+.cqs li>div:last-child{display:flex;gap:6px}
+.cbar{height:5px;background:var(--surface-2);border-radius:3px;overflow:hidden} .cbar i{display:block;height:100%;background:var(--s1)}
+.gtiles>svg.xg{contain:strict} .gsec{margin:22px 0 0} details.acc>summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:4px;min-height:28px} details.acc>summary::-webkit-details-marker{display:none} details.acc>summary::before{content:'chevron_right';font-family:"Material Symbols Outlined";font-size:20px;line-height:1;color:var(--muted);width:20px;transition:transform .15s} details.acc[open]>summary::before{transform:rotate(90deg)} details.acc>summary h3{display:inline} .gsec h3{margin:0 0 2px;font-size:15px} .gdesc{color:var(--muted);font-size:12.5px;margin:0 0 8px} .gsec .xwrap{margin-top:6px}
+.xg .colh.side{fill:var(--s2)} .xg path.xtra{stroke-opacity:.28} .xg .xn.side rect:not(.bg){stroke-dasharray:3 2}
+.blegend i.l-const{border-top:1.8px solid var(--s2)} .blegend i.l-short{border-top:1.5px dashed var(--s2)} .ev.p-const{background:var(--s2-wash)}
+.xg .mk.p-causes{fill:var(--ink-2)} .xg .mk.p-manifest{fill:var(--s4)} .xg .mk.p-pheno{fill:var(--s5)} .xg .mk.p-test{fill:var(--s1)} .xg .mk.p-sub{fill:var(--axis)}
+.blegend i.l-causes{border-top:1.5px solid var(--ink-2)} .blegend i.l-manifest{border-top:1.5px solid var(--s4)} .blegend i.l-pheno{border-top:1.5px solid var(--s5)} .blegend i.l-test{border-top:1.5px solid var(--s1)}
+.ev.p-causes{background:var(--surface-2)} .ev.p-manifest{background:var(--s4-wash)} .ev.p-pheno{background:var(--s5-wash)} .ev.p-test{background:var(--s1-wash)}
+.dsec .path{color:var(--muted);font-size:11.5px;overflow-wrap:anywhere}
+.seg{display:inline-flex;border:1px solid var(--axis);border-radius:8px;overflow:hidden;flex-wrap:wrap}
+.seg button{border:0;background:var(--surface);padding:5px 12px;cursor:pointer;font-size:13px;color:var(--ink-2)}
+.seg button+button{border-left:1px solid var(--axis)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--page)}
+.etabs{margin-top:12px} .dsub .etabs{margin:0}
+/* 상세: 되돌아가기 줄 (늘 같은 높이, 앱 바 아래에 붙음) */
+.xnav{position:sticky;top:calc(env(safe-area-inset-top,0px) + var(--tabs-h,52px));z-index:20;display:flex;gap:6px;align-items:center;background:var(--page);height:46px;margin:-6px 0 4px;border-bottom:1px solid var(--grid)}
+.xnav .sp{flex:1}
+.crumbs2{flex:1 1 auto;min-width:0;display:flex;align-items:center;gap:2px;overflow-x:auto;scrollbar-width:none;white-space:nowrap;font-size:13.5px;margin-left:4px}
+.crumbs2 .cb{border:0;background:none;padding:4px 6px;border-radius:6px;color:var(--ink-2);cursor:pointer;white-space:nowrap;font:inherit;font-size:13.5px}
+.crumbs2 button.cb:hover{background:var(--surface-2);color:var(--ink)}
+.crumbs2 .cb.cur{color:var(--ink);font-weight:600;cursor:default}
+.crumbs2 .csep{font-size:16px;color:var(--muted)}
+.pop .cbi{display:block;width:100%;text-align:left;border:0;background:none;padding:6px 8px;border-radius:6px;cursor:pointer;font:inherit;color:var(--ink)}
+.pop .cbi:hover{background:var(--surface-2)}
+.tbtn{display:inline-flex;align-items:center;gap:5px;height:32px;padding:0 10px;border:1px solid var(--ring);background:var(--surface);border-radius:var(--r);cursor:pointer;font-size:13.5px;color:var(--ink-2);white-space:nowrap;max-width:100%}
+.tbtn .ms{font-size:18px}
+.tbtn:hover:not(:disabled){border-color:var(--axis);color:var(--ink)}
+.tbtn:disabled{opacity:.45;cursor:default}
+.tbtn.icon{padding:0 7px}
+.tbtn .bl{overflow:hidden;text-overflow:ellipsis;max-width:22ch}
+.tbtn .dot{background:var(--s1);color:#fff;border-radius:999px;font-size:11px;line-height:16px;min-width:16px;text-align:center;padding:0 4px}
+@media (max-width:600px){.tbtn .bl{max-width:10ch}}
+/* 상세 머리말: 네 줄, 줄마다 높이 고정 (종류·코드 / 이름 + 자세히 아이콘 / 영어 이름 / 병명 탭) */
+.dhead{display:grid;grid-template-rows:24px 32px 20px 40px;min-width:0;margin:6px 0 4px}
+.dl1{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--ink-2);min-width:0;white-space:nowrap;overflow:hidden}
+.dl1 .kind{border-radius:4px;padding:0 7px;line-height:20px;font-size:12px;font-weight:500;background:var(--surface-2);color:var(--ink-2);flex:none}
+.dl1 .k-D{background:var(--s2-wash);color:var(--s2)} .dl1 .k-F,.dl1 .k-H{background:var(--s3-wash);color:var(--s3)} .dl1 .k-M,.dl1 .k-X,.dl1 .k-C{background:var(--s4-wash);color:var(--s4)} .dl1 .k-A,.dl1 .k-T,.dl1 .k-G{background:var(--s1-wash);color:var(--s1)}
+.dl1 .dtop{overflow:hidden;text-overflow:ellipsis}
+.dhead h2{font-size:22px;line-height:32px;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600;letter-spacing:-.01em}
+.dhead .den{font-size:13.5px;color:var(--muted);font-style:italic;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:20px}
+.dtl{display:flex;align-items:center;gap:4px;min-width:0}
+.dtl h2{flex:0 1 auto;min-width:0}
+.dtl>button{flex:none}
+.dinfo{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border:0;border-radius:var(--r);background:none;color:var(--muted);cursor:pointer}
+.dinfo:hover,.dinfo[aria-expanded="true"]{background:var(--surface-2);color:var(--ink)}
+.dinfo .ms{font-size:20px}
+.dsub{display:flex;align-items:center;gap:8px;min-width:0;overflow-x:auto;overflow-y:hidden;white-space:nowrap;font-size:13.5px;scrollbar-width:thin}
+.dsub .seg{flex-wrap:nowrap}
+.dsub .seg button{white-space:nowrap}
+.nomech{border:1px dashed var(--axis);background:var(--surface);border-radius:4px;padding:0 6px;line-height:20px;font-size:12px;color:var(--ink-2);cursor:pointer}
+.nomech.mk-draft{border-color:var(--s1);color:var(--s1)} .nomech.mk-gene{border-color:var(--s5);color:var(--s5)}
+/* 그래프 칸 */
+.ghead{display:flex;align-items:center;gap:6px;min-height:28px}
+.ghead h3,.gsec summary h3{margin:0;font-size:16px;font-weight:600}
+.gcnt{font-weight:400;font-size:13px;color:var(--muted);margin-left:6px}
+.ginfo,.ghelp{border:0;background:none;color:var(--muted);cursor:pointer;padding:2px;display:inline-flex;border-radius:50%}
+.ginfo:hover,.ghelp:hover{color:var(--ink);background:var(--surface-2)}
+.ginfo .ms,.ghelp .ms{font-size:18px}
+.gempty{text-align:left;padding:10px 0}
+.gzbar{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin:6px 0 0;font-size:12.5px;color:var(--muted)}
+.gzbar .ghelp{margin-left:auto}
+/* 전체 보기 팝업 */
+body.gm-on{overflow:hidden}
+.gmodal{position:fixed;inset:0;z-index:55}
+.gm-scrim{position:absolute;inset:0;background:rgba(11,11,11,.42)}
+.gm-panel{position:absolute;inset:max(16px,3vh) max(16px,3vw);background:var(--surface);border:1px solid var(--ring);border-radius:12px;box-shadow:var(--shadow);display:flex;flex-direction:column;overflow:hidden}
+.gm-head{display:flex;align-items:center;gap:12px;padding:10px 12px 10px 16px;border-bottom:1px solid var(--grid)}
+.gm-head>b{font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:0 1 auto}
+.gm-head .gzbar{margin:0;flex:1 1 auto;flex-wrap:nowrap;overflow-x:auto}
+.gm-wrap{flex:1;height:auto!important;margin:0;border:0;border-radius:0}
+.gpad{width:max-content}
+.xg .xn.clicked rect.card,.xg .xn:focus rect.card{stroke:var(--tc);stroke-width:2.6}
+.xg .xn:focus{outline:none}
+@media (max-width:720px){.gm-panel{inset:8px}.gm-head{flex-wrap:wrap}}
+.gzbar button{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--ring);background:var(--surface);border-radius:6px;min-width:30px;height:28px;padding:0 8px;cursor:pointer;font-size:12.5px;color:var(--ink-2);justify-content:center}
+.gzbar button .ms{font-size:18px}
+.gzbar button.ghelp{border:0;min-width:0;padding:2px}
+.gzbar button:hover,.gzbar button:focus-visible{border-color:var(--s4);color:var(--ink);outline:none}
+.gzbar output{min-width:44px;text-align:center;font-variant-numeric:tabular-nums;color:var(--ink)}
+.gzbar .gzpin{display:inline-flex;align-items:center;gap:4px;background:var(--s4-wash);color:var(--ink);border-radius:999px;padding:1px 2px 1px 8px}
+.gzbar .gzpin .ms{font-size:16px}
+.gzbar .gzpin button{border:0;background:transparent;min-width:24px;height:24px;padding:0}
+.xwrap{cursor:grab;touch-action:pan-x pan-y} .xwrap.gzdrag{cursor:grabbing} .xwrap:focus-visible{outline:2px solid var(--s4);outline-offset:1px} .xg text{user-select:none;-webkit-user-select:none}
+.xg .xn.pinned rect:not(.bg){stroke-width:3.5} .xg .xn.pinned text{font-weight:600}
+.nomech{font-size:10.5px;color:var(--muted);border:1px dashed var(--axis);border-radius:4px;padding:0 4px;margin-left:4px;white-space:nowrap}
+.nomechbox{border:1px dashed var(--axis);border-radius:8px;padding:10px 12px;font-size:12.5px;color:var(--ink-2);margin:14px 0 0;background:var(--surface)}
+.xwrap{overflow:auto;height:420px;overscroll-behavior:contain;border:1px solid var(--ring);border-radius:10px;background:var(--surface);margin:8px 0 0;min-width:0}
+.xg{display:block}
+.xg text{font-family:var(--font);font-size:12px;fill:var(--ink)}
+.xg .colh{font-size:11px;fill:var(--muted);letter-spacing:.04em}
+.xg .xn{cursor:pointer}
+.xg .xn rect{stroke-width:1}
+.xg .xn.F rect{fill:var(--s3-wash);stroke:var(--s3)}
+.xg .xn.M rect{fill:var(--s4-wash);stroke:var(--s4)}
+.xg .xn.D rect{fill:var(--s2-wash);stroke:var(--s2)}
+.xg .xn.H rect{fill:var(--s5-wash);stroke:var(--s5)}
+.xg .xn.G rect{fill:var(--s1-wash);stroke:var(--s1)} .xg .xn.P rect{fill:var(--surface-2);stroke:var(--ink-2);stroke-dasharray:3 2} .xg .xn.C rect{fill:var(--s4-wash);stroke:var(--s1);stroke-dasharray:2 2}
+.xg path.fill-B,.xg path.fill-A{stroke:var(--s1)} .xg path.fill-A{stroke-opacity:.7} .xg path.conf-1{stroke-dasharray:6 3} .xg path.conf-0{stroke-dasharray:2 3;stroke-opacity:.55}
+.blegend i.l-fill{border-top:1.5px solid var(--s1)} .blegend i.l-conf1{border-top:1.5px dashed var(--s1)} .blegend i.l-conf0{border-top:1.5px dotted var(--s1)}
+.conf{font-size:10.5px;border-radius:4px;padding:0 5px;white-space:nowrap} .conf.c3{background:var(--s3-wash)} .conf.c2{background:var(--s5-wash)} .conf.c1{background:var(--s2-wash)} .conf.c0{background:var(--surface-2);color:var(--muted)}
+.xg .xn.X rect{fill:var(--s4-wash);stroke:var(--s4);stroke-dasharray:5 3}
+.xg path.xm{stroke:var(--s4);stroke-dasharray:2 3} .xg path.dmk{stroke:var(--s4)} .xg path.xx{stroke:var(--s4);stroke-width:1.6}
+.blegend i.lx{border-top:1.5px dashed var(--s4)}
+.xg path.ext{stroke:var(--s5)} .xg path.ext.sub{stroke-dasharray:3 3} .xg path.ext.deny{stroke-opacity:.5}
+.blegend i.le{border-top:1.5px solid var(--s5)}
+.ev.ext{background:var(--s5-wash)} .ev.deny{box-shadow:inset 0 0 0 1px var(--s2)} .ev.subd{background:var(--surface-2);color:var(--ink-2)}
+.xfilter{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:12.5px;color:var(--ink-2);margin:14px 0 0}
+.xfilter label{display:inline-flex;gap:6px;align-items:center}
+.xg .xn rect.bg{fill:var(--surface)!important;stroke:none!important}
+.xg .xn.focus rect:not(.bg){stroke-width:2.5}
+.xg .xn.focus text{font-weight:600}
+.xg .xn .sub{font-size:10.5px;fill:var(--ink-2);font-weight:400}
+.xg .xn .enl{font-size:10.5px;fill:var(--muted);font-weight:400;font-style:italic}
+.ko{display:block} .en{display:block;font-size:11px;color:var(--muted);font-style:italic;line-height:1.3}
+a.fk .en,button.fk .en{color:var(--muted);text-decoration:none}
+.xg path.xe{fill:none;stroke:var(--edge)}
+.xg path.fm{stroke:var(--s3);stroke-dasharray:4 3}
+.xg path.fd{stroke:var(--s3)}
+.xg path.chief{stroke:var(--ink)}
+.xg path.branch{stroke:var(--ink);stroke-dasharray:1 3}
+/* 강조: 올리기 = 살짝 · 우클릭 고정 = 경로 전체 */
+.xwrap.hov .xg .xn:not(.lit){opacity:.55}
+.xwrap.hov .xg path.xe:not(.lit){opacity:.32}
+.xwrap.hov .xg .xn.hot rect:not(.bg){stroke-width:2.2}
+.xwrap.pin .xg .xn:not(.lit){opacity:.16}
+.xwrap.pin .xg path.xe:not(.lit){opacity:.06}
+.xwrap.pin .xg path.xe.lit{stroke-width:2.2px;stroke-opacity:1}
+.xwrap.pin .xg .xn.lit rect:not(.bg){stroke-width:1.8}
+.xg path.xh{fill:none;stroke:transparent;stroke-width:9px;pointer-events:stroke;cursor:help}
+
+.xg path.xe.ehot{stroke-width:2.6px;stroke-opacity:1;opacity:1}
+.blegend i.lc{border-top:2.5px solid var(--ink)} .blegend i.ld{border-top-color:var(--s3)} .blegend i.lf{border-top:1.5px dashed var(--s3)}
+
+.dsplit{display:block}
+@media (max-width:860px){.dsplit{grid-template-columns:minmax(0,1fr)}}
+.dside{position:sticky;top:calc(env(safe-area-inset-top,0px) + var(--tabs-h,41px) + 8px);display:flex;flex-direction:column;gap:8px;min-width:0}
+@media (max-width:860px){.dside{position:static}}
+.dside input[type=search]{font:inherit;font-size:13px;padding:6px 8px;border:1px solid var(--axis);border-radius:6px;background:var(--surface);color:var(--ink);width:100%}
+.dside label{font-size:12.5px;color:var(--ink-2);display:flex;gap:6px;align-items:center}
+#xlist{border:1px solid var(--ring);border-radius:10px;background:var(--surface);max-height:calc(100vh - var(--tabs-h,52px) - 150px);overflow:auto;display:flex;flex-direction:column}
+@media (max-width:860px){#xlist{max-height:260px}}
+#xlist button.li{display:grid;grid-template-columns:58px minmax(0,1fr) auto;gap:10px;align-items:center;border:0;border-bottom:1px solid var(--grid);background:none;padding:8px 12px 8px 10px;text-align:left;cursor:pointer;min-height:54px}
+#xlist button.li:hover{background:var(--surface-2)}
+#xlist button.li[aria-pressed="true"]{background:var(--s1-wash);box-shadow:inset 3px 0 0 var(--s1)}
+#xlist .code{display:flex;flex-direction:column;gap:2px;min-width:0}
+#xlist .code .mono{font-size:12.5px;color:var(--ink-2)}
+#xlist .code .mk{font-size:10.5px;line-height:15px;border-radius:4px;padding:0 4px;width:fit-content;white-space:nowrap;background:var(--surface-2);color:var(--muted)}
+#xlist .code .mk-draft{background:var(--s1-wash);color:var(--s1)} #xlist .code .mk-gene{background:var(--s5-wash);color:var(--s5)}
+#xlist .dn{overflow:hidden;font-size:14.5px;min-width:0;line-height:1.35}
+#xlist .dn .ko,#xlist .dn .en{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#xlist .dn .en{font-size:12px}
+#xlist .dn .hit{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11.5px;color:var(--s1);background:var(--s1-wash);border-radius:4px;padding:0 4px;margin-top:2px;width:fit-content;max-width:100%}
+#xlist .cnt{display:flex;flex-direction:column;align-items:flex-end;gap:1px;font-size:11.5px;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums;min-width:52px;text-align:right}
+#xlist .cnt b{font-weight:600;color:var(--ink-2);margin-right:3px;font-size:12.5px}
+#xlist .cnt .none{opacity:.8}
+.search{display:flex;align-items:center;gap:6px;border:1px solid var(--axis);border-radius:var(--r);background:var(--surface);padding:0 10px;height:40px}
+.search:focus-within{border-color:var(--s1);box-shadow:0 0 0 3px var(--s1-wash)}
+.search .ms{color:var(--muted)}
+.search input{border:0!important;outline:0;background:transparent!important;padding:0!important;height:100%;flex:1;min-width:0;font:inherit;font-size:14.5px!important;color:var(--ink)}
+.lhead{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13px;color:var(--ink-2);padding:0 2px}
+.sortl{display:inline-flex;align-items:center;gap:2px;color:var(--ink-2)}
+.sortl .ms{font-size:18px}
+.sortl select{border:0;background:transparent;font:inherit;font-size:13px;color:var(--ink);cursor:pointer;padding:2px 0}
+.dhead h2{font-size:20px;margin:2px 0 0;text-wrap:balance}
+.dhead .en{color:var(--ink-2)}
+.dmeta{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 0;font-size:12px;align-items:center}
+.dmeta .badge{background:var(--surface-2)}
+.blegend{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:12px;color:var(--ink-2);margin:8px 2px 0}
+.blegend i{display:inline-block;width:22px;border-top:1.5px solid var(--edge);vertical-align:middle;margin-right:5px}
+.dsec{margin-top:24px}
+.dsec h3{font-size:14px;margin:0 0 8px}
+.ev{display:inline-block;font-size:11.5px;border-radius:4px;padding:0 6px;margin:1px 2px 1px 0}
+.ev.chief{background:var(--surface-2);box-shadow:inset 0 0 0 1px var(--ink-2)}
+.ev.dir{background:var(--s3-wash)}
+.ev.via{background:var(--s4-wash)}
+.evid{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;font-size:12.5px}
+.evid li{display:grid;grid-template-columns:34px minmax(0,1fr);gap:8px}
+.evid .path{color:var(--muted);font-size:11.5px;overflow-wrap:anywhere}
+tr.on td{background:var(--sel)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+/* 그래프 노드: 종류 색으로 칠한 상자 (축소해도 색으로 구분) · 배경은 흰색 그대로 · 위쪽 칸 제목 줄 */
+.xg .xn{--tc:var(--muted)}
+.xg .xn.D{--tc:var(--s2)} .xg .xn.F,.xg .xn.H{--tc:var(--s3)} .xg .xn.M,.xg .xn.X,.xg .xn.C{--tc:var(--s4)} .xg .xn.T,.xg .xn.A,.xg .xn.G{--tc:var(--s1)} .xg .xn.P{--tc:var(--s5)} .xg .xn.E{--tc:var(--ink-2)}
+.xg .xn:hover rect.card{stroke-width:1.8}
+.xg .xn text.t1{font-size:12.5px;font-weight:500}
+.xg .xn.focus text.t1{font-weight:600}
+.xg .xn .enl{font-style:normal;font-size:10.5px;fill:var(--muted)}
+.xg .xn .sub{font-size:10.5px;fill:var(--ink-2)}
+.xg rect.hband{fill:var(--surface)} .xg line.hline{stroke:var(--grid)}
+.xg .colh,.xg .colh.side{font-size:11.5px;fill:var(--ink-2);font-weight:500;letter-spacing:.02em}
+.xg .colh .cn{fill:var(--muted);font-family:var(--mono);font-weight:400}
+/* 보는 거리별 표시 (semantic zoom): 가까이(60%+) 전부 · 멀리(30~60%) 이름만 크게, 선은 같은 굵기 실선 · 아주 멀리(<30%) 색 상자만 */
+.xg .xn text.t2{display:none;font-size:21px;font-weight:600}
+.lod-mid .xg .xn text:not(.t2){display:none}
+.lod-mid .xg .xn text.t2{display:inline}
+.lod-far .xg .xn text{display:none}
+.lod-mid .xg path.xe,.lod-far .xg path.xe{stroke-dasharray:none;stroke-width:1.3px;vector-effect:non-scaling-stroke}
+.lod-mid .xg path.xe.xtra,.lod-far .xg path.xe.xtra{stroke-opacity:.12}
+/* 선은 반투명: 여러 선이 같은 길을 지나면 겹친 만큼 진해진다 (한 줄 .55 → 두 줄 .8 → 세 줄 .91) */
+.xg path.xe{stroke-opacity:.55}
+.xg path.xe.xtra{stroke-opacity:.2}
+.lod-mid .xg .xn rect.card,.lod-far .xg .xn rect.card{vector-effect:non-scaling-stroke;stroke-dasharray:none}
+.lod-far .xg .colh .cn{display:none}
+</style>
+
+<header class="appbar">
+  <div class="in">
+    <button class="sidebtn" id="sideBtn" type="button" aria-label="목록 접기·펴기" aria-controls="side" title="목록 접기·펴기"><span class="ms" aria-hidden="true">menu</span></button>
+    <div class="brand"><span class="ms" aria-hidden="true">database</span><b>의료 agent 지식 DB</b></div>
+    <nav class="tabs" role="tablist" aria-label="화면">
+      <button role="tab" id="tab-explore" aria-selected="true" data-tab="explore"><span class="ms" aria-hidden="true">account_tree</span>관계 그래프</button>
+      <button role="tab" id="tab-consult" aria-selected="false" data-tab="consult"><span class="ms" aria-hidden="true">stethoscope</span>진료</button>
+      <button role="tab" id="tab-structure" aria-selected="false" data-tab="structure"><span class="ms" aria-hidden="true">schema</span>구조</button>
+      <button role="tab" id="tab-tables" aria-selected="false" data-tab="tables"><span class="ms" aria-hidden="true">table_rows</span>테이블</button>
+    </nav>
+    <button class="snap" id="snapBtn" type="button" aria-haspopup="dialog"><span class="ms" aria-hidden="true">info</span><span class="t" id="snapT">DB 정보</span></button>
+  </div>
+</header>
+<aside class="sidebar" id="side" aria-label="목록">
+  <div class="sidepane" id="sideExplore">
+    <div class="seg" id="xseg" role="group" aria-label="가운데 둘 종류"><button data-mode="disease" aria-pressed="true">질병</button><button data-mode="finding" aria-pressed="false">소견</button><button data-mode="mechanism" aria-pressed="false">기전</button><button data-mode="test" aria-pressed="false">검사</button></div>
+    <label class="search"><span class="ms" aria-hidden="true">search</span><input id="xq" type="search" placeholder="병명·질병명·KCD 코드 (KCD 전체에서 찾습니다)" aria-label="찾기"></label>
+    <div class="lhead"><span id="xcount"></span><label class="sortl" title="목록 정렬"><span class="ms" aria-hidden="true">swap_vert</span><select id="xsort" aria-label="목록 정렬"><option value="score">연결 많은 순</option><option value="code">코드순</option><option value="name">이름순 (가나다)</option></select></label></div>
+    <div id="xlist"></div>
+  </div>
+  <div class="sidepane" id="sideTables" hidden>
+    <label class="search sm"><span class="ms" aria-hidden="true">search</span><input id="tfind" type="search" placeholder="테이블 찾기" aria-label="테이블 찾기"></label>
+    <div class="tree" id="tpick"></div>
+  </div>
+</aside>
+<div class="sidescrim" id="sideScrim" hidden></div>
+<div id="snapBox" hidden><h4>스냅숏</h4><p class="sub" id="sub"></p><div class="stats" id="stats"></div><h4 style="margin-top:14px">출처·이용 조건</h4><ul class="srcl" id="srcl"></ul></div>
+
+<div class="wrap">
+
+  <section id="sec-explore">
+    <div id="xdetail" style="min-width:0"></div>
+  </section>
+
+  <section id="sec-structure" hidden>
+    <div class="legend">
+      <span><svg width="34" height="14" aria-hidden="true"><path d="M2,1 L13,7 M2,13 L13,7 M2,7 H32" stroke="currentColor" fill="none"/><circle cx="18" cy="7" r="3" fill="var(--page)" stroke="currentColor"/></svg>여럿 (외래키 쪽)</span>
+      <span><svg width="34" height="14" aria-hidden="true"><path d="M2,7 H32 M25,1 V13 M20,1 V13" stroke="currentColor" fill="none"/></svg>정확히 하나</span>
+      <span><svg width="34" height="14" aria-hidden="true"><path d="M2,7 H32 M25,1 V13" stroke="currentColor" fill="none"/><circle cx="18" cy="7" r="3" fill="var(--page)" stroke="currentColor"/></svg>없거나 하나</span>
+      <span><svg width="34" height="14" aria-hidden="true"><path d="M2,7 H32" stroke="currentColor" stroke-dasharray="4 3" fill="none"/></svg>구체화 뷰의 이름 연결 (외래키 아님)</span>
+    </div>
+    <p class="muted" id="erdinfo" style="margin:0 0 6px;font-size:13px">테이블에 마우스를 올리면 연결이 강조되고, 누르면 그 테이블을 엽니다.</p>
+    <div class="erdwrap xwrap" id="erd" data-gi="e0" tabindex="0" aria-label="ERD: 끌어서 이동, Ctrl+휠로 확대·축소"></div>
+  </section>
+
+  <section id="sec-consult" hidden>
+    <div id="consult"></div>
+  </section>
+
+  <section id="sec-tables" hidden>
+    <div class="dbx">
+      <div class="dbmain">
+        <div class="dbhead" id="dbhead"></div>
+        <div class="toolbar" id="toolbar"></div>
+        <div class="split nopanel" id="split">
+          <div class="gridcol">
+            <div class="tablewrap dg" id="tablewrap"></div>
+            <div class="pager" id="pager"></div>
+          </div>
+          <aside class="panel" id="panel" hidden></aside>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<script src="data.js"></script>
+<script src="pheno.js"></script>
+<script src="fill.js"></script>
+<script>
+const D = window.DB, T = D.tables;
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmt = n => n.toLocaleString('ko-KR');
+const NAMES = Object.keys(T);
+const ic = (n, t) => `<span class="ms" aria-hidden="true">${n}</span>${t || ''}`;
+/* 팝오버: 단추 아래에 띄우고, 바깥을 누르거나 Esc 를 누르면 닫는다 */
+let POP = null;
+function closePop() { if (POP) { POP.el.remove(); POP.btn && POP.btn.setAttribute('aria-expanded', 'false'); POP = null; } }
+function pop(btn, html, bind) {
+  const again = POP && POP.btn === btn; closePop(); if (again) return null;
+  const el = document.createElement('div'); el.className = 'pop'; el.setAttribute('role', 'dialog'); el.innerHTML = html; document.body.appendChild(el);
+  const r = btn.getBoundingClientRect(), w = el.offsetWidth, h = el.offsetHeight;
+  el.style.left = Math.max(12, Math.min(r.left, innerWidth - w - 12)) + 'px';
+  el.style.top = (r.bottom + 6 + h > innerHeight - 8 && r.top - h - 6 > 8 ? r.top - h - 6 : r.bottom + 6) + 'px';
+  POP = {el, btn}; btn.setAttribute('aria-expanded', 'true');
+  if (bind) bind(el);
+  return el;
+}
+document.addEventListener('mousedown', e => { if (POP && !POP.el.contains(e.target) && !POP.btn.contains(e.target)) closePop(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && POP) { closePop(); e.stopImmediatePropagation(); } }, true);
+addEventListener('resize', closePop);
+const ROLE_KO = {presentation:'주호소', category:'분류축', mechanism:'기전', finding:'소견', disease:'질환', cause:'원인', note:'메모'};
+
+/* ── 테이블 도우미 ── */
+const colIx = {};
+NAMES.forEach(n => { colIx[n] = {}; T[n].columns.forEach((c, i) => colIx[n][c.name] = i); });
+const val = (n, row, col) => row[colIx[n][col]];
+const pkOf = (n, row) => T[n].pk.map(c => val(n, row, c)).join('\u0001');
+const fkMap = {};  // fkMap[table][col] = {table, refcol, virtual}
+NAMES.forEach(n => { fkMap[n] = {}; T[n].fks.forEach(f => { if (f.cols.length === 1) fkMap[n][f.cols[0]] = {table: f.table, refcol: f.refcols[0], virtual: f.virtual}; }); });
+const _pk = {}, _ix = {};
+function byPk(n, key) {
+  if (!_pk[n]) { _pk[n] = new Map(); T[n].rows.forEach(r => _pk[n].set(pkOf(n, r), r)); }
+  return _pk[n].get(String(key));
+}
+function byCol(n, col, v) {
+  const k = n + '.' + col;
+  if (!_ix[k]) { _ix[k] = new Map(); const i = colIx[n][col]; T[n].rows.forEach(r => { const x = r[i]; if (x == null || Array.isArray(x)) return; const s = String(x); (_ix[k].get(s) || _ix[k].set(s, []).get(s)).push(r); }); }
+  return _ix[k].get(String(v)) || [];
+}
+function label(n, r) {
+  const v = c => val(n, r, c);
+  switch (n) {
+    case 'disease': return `${v('kcd')} ${v('name_ko')}`;
+    case 'presentation': case 'finding': case 'mechanism': return v('name_ko');
+    case 'source': return v('title');
+    case 'schema_doc': return `${v('id')} · ${(byPk('presentation', v('presentation_id')) || [])[1] || v('presentation_id')} 스키마`;
+    case 'schema_node': return `[${ROLE_KO[v('role')]}] ${v('text')}`;
+    case 'node_concept': return `${v('item')} → ${v('kcd') || v('finding_id') || v('mechanism_id') || '(코드 없음)'}`;
+    case 'node_ancestor': return `${v('node_id')} ← ${v('anc_id')} (${v('dist')}단계)`;
+  }
+  return pkOf(n, r).replace(/\u0001/g, ' · ');  /* 복합 키는 · 로 잇는다 */
+}
+const dotted = c => c && c.length > 3 && /^[A-Z]\d\d/.test(c) ? c.slice(0, 3) + '.' + c.slice(3) : c;  /* E830 → E83.0 */
+const short = (s, k = 70) => s.length > k ? s.slice(0, k - 1) + '…' : s;
+function fkButton(n, col, v, text) {
+  const f = fkMap[n][col];
+  return `<button class="fk" data-goto="${f.table}" data-key="${esc(v)}">${esc(text ?? v)}</button>`;
+}
+
+/* ── 머리말 ── (병명·기전·검사 표가 만들어진 뒤 '시작'에서 부른다) */
+function header() {
+  const nTab = NAMES.filter(n => T[n].kind === 'table').length, nMv = NAMES.length - nTab;
+  $('#sub').innerHTML = `${D.version ? `판 <code>${esc(D.version)}</code> · ` : ''}PostgreSQL <code>${esc(D.db)}</code> 스냅숏 · ${esc(D.generated_at)} · 테이블 ${nTab}개 · 구체화 뷰 ${nMv}개`;
+  const SRC_TITLE = {claude_draft: 'AI (Claude)가 정리한 연결', claude_mech: 'AI (Claude) 기전 + 독립 검토'};
+  $('#srcl').innerHTML = Object.entries(D.sources || {}).filter(([c]) => !(D.public && c === 'hpoa')).map(([c, v]) => `<li><b>${esc(SRC_TITLE[c] || v.title || c)}</b>${v.version ? ` <span class="muted">${esc(v.version)}</span>` : ''}${v.rights ? `<br><span class="muted">${esc(v.rights)}</span>` : ''}</li>`).join('')
+    + (D.public ? '<li><b>공개판</b><br><span class="muted">HPOA(phenotype.hpoa)에서만 온 연결은 이용 조건 때문에 뺐습니다.</span></li>' : '')
+    + '<li><b>글꼴</b><br><span class="muted">Pretendard (SIL Open Font License 1.1) · IBM Plex Mono (SIL OFL 1.1)</span></li>';
+  const gm = /(\d{4})-(\d{2})-(\d{2})[ T](\d{2}:\d{2})/.exec(D.generated_at || '');
+  $('#snapT').textContent = gm ? `스냅숏 ${gm[2]}/${gm[3]} ${gm[4]}` : 'DB 정보';
+  const st = D.stats || {};
+  const stat = (b, s, sub, tip) => `<div class="stat"${tip ? ` title="${esc(tip)}"` : ''}><b>${b}</b><span>${s}</span>${sub ? `<small>${sub}</small>` : ''}</div>`;
+  const codes = T.disease.rows.map(r => val('disease', r, 'kcd')).filter(k => k.length <= 4);
+  const hpoOnly = [...KPh.keys()].filter(h => !HPO2F.has(h)).length;
+  const byP = {}; let nEdge = 0;
+  GO.forEach(es => es.forEach(e => { byP[e.p] = (byP[e.p] || 0) + 1; nEdge++; }));
+  const P = [['has_phenotype', '질병→소견'], ['causes', '일으킴'], ['manifests_as', '기전→소견'], ['constitutes', '이룸'], ['indicates', '검사→소견'], ['subclass_of', '종류']];
+  const cause = (byP.causes || 0) + (byP.constitutes || 0);
+  $('#stats').innerHTML =
+    stat(fmt(ENT.size + codes.filter(k => !ENTS.has(k)).length), '병명', `KCD ${fmt(codes.length)} · 개별 병명 ${fmt(ENT.size)}`, `KCD 3·4자리 분류 ${fmt(codes.length)}개 중 ${fmt(ENTS.size)}개가 개별 병명 ${fmt(ENT.size)}개로 나뉨 (예: E83.0 구리대사장애 → 윌슨병 · 멘케스병)`) +
+    stat(fmt(T.finding.rows.length + hpoOnly), '소견', `HPO ${fmt(hpoOnly)} · 자체 ${fmt(T.finding.rows.length)}`) +
+    stat(fmt(T.mechanism.rows.length + DMm.size), '기전', `DisMech ${fmt(DMm.size)} · 자체 ${fmt(T.mechanism.rows.length)}`, FL ? `채우기: AI 기전 노드 ${fmt(Object.keys(FN).filter(k => k.startsWith('CDM:')).length)} · 원인 유전자 ${fmt(Object.values(FN).filter(n => n[0] === '유전자').length)} · GO 과정 ${fmt(Object.values(FN).filter(n => n[0] === '과정').length)}` : '') +
+    stat(fmt(ANV.size), '검사', `LOINC ${fmt(Object.keys(LOINC).length)}종`) +
+    stat(fmt(nEdge), '연결', `표현형 ${fmt(byP.has_phenotype || 0)} · 인과 ${fmt(cause)} · 나타남 ${fmt(byP.manifests_as || 0)} · 검사 ${fmt(byP.indicates || 0)}`, P.filter(([k]) => byP[k]).map(([k, l]) => `${l} ${fmt(byP[k])}`).join(' · ') + ` · DB 전체 관계 ${fmt(st.assertions || 0)}`);
+}
+
+/* ── 탭 ── */
+/* 사이드바: 관계 그래프 탭은 질병·소견·기전·검사 목록, 테이블 탭은 테이블 트리. 넓은 화면은 접고 펴고, 좁은 화면은 서랍처럼 연다 */
+let SIDE_COLLAPSED = false; try { SIDE_COLLAPSED = localStorage.getItem('side_collapsed') === '1'; } catch (e) {}
+const narrow = () => innerWidth <= 900;
+function sideSync(id) {
+  const on = id === 'explore' || id === 'tables', b = document.body;
+  b.classList.toggle('side-on', on); b.classList.toggle('side-collapsed', on && SIDE_COLLAPSED && !narrow());
+  if (!on) sideOpen(false);
+  $('#sideExplore').hidden = id !== 'explore'; $('#sideTables').hidden = id !== 'tables';
+}
+function sideOpen(v) { document.body.classList.toggle('side-open', !!v); $('#sideScrim').hidden = !v; }
+$('#sideBtn').onclick = () => {
+  if (narrow()) { sideOpen(!document.body.classList.contains('side-open')); return; }
+  SIDE_COLLAPSED = !SIDE_COLLAPSED; try { localStorage.setItem('side_collapsed', SIDE_COLLAPSED ? '1' : ''); } catch (e) {}
+  document.body.classList.toggle('side-collapsed', SIDE_COLLAPSED);
+  requestAnimationFrame(() => { fillList(); paintGraphs(true); });
+};
+$('#sideScrim').onclick = () => sideOpen(false);
+addEventListener('resize', () => { const t = document.querySelector('.tabs button[aria-selected="true"]'); if (t) sideSync(t.dataset.tab); if (!narrow()) sideOpen(false); });
+function showTab(id) {
+  document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === id));
+  sideSync(id);
+  ['explore', 'structure', 'tables', 'consult'].forEach(s => $('#sec-' + s).hidden = s !== id);
+  if (id === 'consult') renderConsult();
+  if (id === 'explore' && !x.cur) { const first = [...SKREF].filter(([k]) => k[0] === 'D').sort((a, b) => b[1].size - a[1].size)[0]; if (first) focusOn('D', first[0].slice(2), true); else renderList(); }
+  if (id === 'structure') renderErd();
+  if (id === 'explore' || id === 'consult') requestAnimationFrame(() => paintGraphs(true));  /* 숨어 있는 동안 비운 그래프 조각을 다시 칠한다 */
+  try { history.replaceState(null, '', '#' + id); } catch (e) {}
+}
+document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => showTab(b.dataset.tab));
+$('#snapBtn').onclick = e => pop(e.currentTarget, $('#snapBox').innerHTML.replace(/ id="[^"]+"/g, ''));
+
+/* ── 구조 (ERD) ── 열: 원문 | 정규화 | 출처(성균관의대·KCD) | 출처(HPO·MONDO·DisMech·LOINC) | 통합·보조. 선은 외래키(점선은 구체화 뷰의 이름 연결), 끝 모양은 까마귀발 표기 */
+const ERD_COLS = [
+  ['schema_doc', 'schema_node'],
+  ['node_concept'],
+  ['source', 'presentation', 'finding', 'mechanism', 'skku_exposure', 'disease', 'kg_edge'],
+  ['ext_term', 'ext_xref', 'ext_disease_phenotype', 'ext_mechanism', 'ext_lab_hpo', 'loinc_term'],
+  ['term', 'assertion', 'kcd_ext', 'kcd_ext_node', 'hpo_finding', 'kcd_phenotype', 'disease_phenotype'],
+];
+const ERD_TOP = [56, 380, 56, 56, 56];        // 열마다 첫 상자의 y (node_concept는 schema_doc 선이 위로 지나가게 낮춘다)
+const ERD_GAP = [54, 60, 136, 128, 120];        // 열 왼쪽 통로 폭 (선이 세로로 지나간다)
+const layerOf = n => Object.keys(D.layers).find(l => D.layers[l].includes(n));
+function renderErd() {
+  const el = $('#erd'); if (el.dataset.done) return; el.dataset.done = 1;
+  const BW = 252, HH = 32, RH = 20, PAD = 6, GAP = 26;
+  const colX = []; let cx = 0;
+  ERD_COLS.forEach((c, i) => { cx += ERD_GAP[i]; colX.push(cx); cx += BW; });
+  const W = cx + 24, box = {};
+  ERD_COLS.forEach((c, i) => { let y = ERD_TOP[i]; c.forEach(n => { const h = HH + (T[n].columns.length + (T[n].hidden.length ? 1 : 0)) * RH + PAD; box[n] = {x: colX[i], y, w: BW, h, col: i}; y += h + GAP; }); });
+  const H = Math.max(...Object.values(box).map(b => b.y + b.h)) + 24;
+  const rowY = (n, c) => box[n].y + HH + Math.max(0, T[n].columns.findIndex(z => z.name === c)) * RH + RH / 2;
+  /* 관계와 통로 */
+  const rels = [];
+  ERD_COLS.flat().forEach(n => T[n].fks.forEach(f => {
+    if (f.cols.length !== 1 || !box[f.table]) return;
+    const col = T[n].columns.find(z => z.name === f.cols[0]), a = box[n], b = box[f.table];
+    const left = a.col > b.col;                       // 왼쪽 열을 가리키면 대상의 오른쪽 통로, 아니면 대상의 왼쪽 통로
+    rels.push({from: n, col: f.cols[0], to: f.table, ref: f.refcols[0], virtual: f.virtual, notnull: !!(col && col.notnull),
+      ch: left ? b.col + 1 : b.col, srcSide: left || a.col === b.col ? -1 : 1, dstSide: left ? 1 : -1,
+      ya: rowY(n, f.cols[0]), yb: rowY(f.table, f.refcols[0])});
+  }));
+  const byCh = {}; rels.forEach(r => (byCh[r.ch] ||= []).push(r));
+  Object.entries(byCh).forEach(([ch, rs]) => {
+    rs.sort((p, q) => (Math.abs(p.ya - p.yb)) - (Math.abs(q.ya - q.yb)));  // 짧은 선을 대상 가까이
+    const x0 = colX[ch] - 10, step = Math.min(9, (ERD_GAP[ch] - 26) / Math.max(1, rs.length - 1));
+    rs.forEach((r, i) => r.lx = x0 - i * step);
+  });
+  const edgeX = (n, side) => side < 0 ? box[n].x : box[n].x + box[n].w;
+  const pathD = r => {
+    const sx = edgeX(r.from, r.srcSide), tx = edgeX(r.to, r.dstSide), lx = r.lx, ya = r.ya, yb = r.yb;
+    if (Math.abs(ya - yb) < 1) return `M${sx},${ya} H${tx}`;
+    const rr = Math.min(6, Math.abs(ya - yb) / 2), dy = yb > ya ? 1 : -1, d1 = lx > sx ? 1 : -1, d2 = tx > lx ? 1 : -1;
+    return `M${sx},${ya} H${lx - d1 * rr} Q${lx},${ya} ${lx},${ya + dy * rr} V${yb - dy * rr} Q${lx},${yb} ${lx + d2 * rr},${yb} H${tx}`;
+  };
+  const feet = r => {   // 외래키 쪽 = 여럿(까마귀발+원), 대상 쪽 = 하나(막대+막대 또는 원)
+    const sx = edgeX(r.from, r.srcSide), d = -r.srcSide === -1 ? -1 : 1, ya = r.ya;
+    const out = r.srcSide;                         // 상자 밖으로 향하는 방향
+    const p = sx + out * 11;
+    let s = `M${sx},${ya - 6} L${p},${ya} M${sx},${ya + 6} L${p},${ya} M${sx},${ya} L${p},${ya}`;
+    let c = `<circle cx="${sx + out * 16}" cy="${ya}" r="3"/>`;
+    const tx = edgeX(r.to, r.dstSide), o2 = r.dstSide, yb = r.yb;
+    s += ` M${tx + o2 * 7},${yb - 6} V${yb + 6}`;
+    if (r.notnull) s += ` M${tx + o2 * 12},${yb - 6} V${yb + 6}`; else c += `<circle cx="${tx + o2 * 14}" cy="${yb}" r="3"/>`;
+    return `<path class="foot" d="${s}"/>${c}`;
+  };
+  const lines = rels.map((r, i) => `<g class="rel${r.virtual ? ' virtual' : ''}" data-from="${r.from}" data-to="${r.to}"><path class="ln" d="${pathD(r)}"/>${feet(r)}<title>${r.from}.${r.col} → ${r.to}.${r.ref}${r.virtual ? ' (뷰: 이름으로 연결)' : ''}${r.notnull ? ' · 필수' : ' · 비어 있을 수 있음'}</title></g>`).join('');
+  const ents = ERD_COLS.flat().map(n => {
+    const b = box[n], t = T[n], L = layerOf(n);
+    const rows = t.columns.map((c, i) => {
+      const y = HH + i * RH, pk = t.pk.includes(c.name), fk = fkMap[n][c.name];
+      const typ = c.type.replace('character varying', 'varchar').replace('timestamp without time zone', 'timestamp');
+      return `<g transform="translate(0,${y})"${pk || fk ? ` class="${pk ? 'pkrow' : ''}${fk ? ' fkrow' : ''}"` : ''}>${i ? `<line class="sep" x1="8" x2="${b.w - 8}" y1="0" y2="0"/>` : ''}${pk ? `<rect class="kpk" x="8" y="4" width="20" height="12" rx="2"/><text class="kt" x="18" y="13.5" text-anchor="middle">PK</text>` : fk ? `<rect class="kfk" x="8" y="4" width="20" height="12" rx="2"/><text class="kt" x="18" y="13.5" text-anchor="middle">FK</text>` : ''}<text class="cn" x="34" y="14">${esc(short(c.name, 20))}</text><text class="ct" x="${b.w - 9}" y="14" text-anchor="end">${esc(short(typ, 12))}${c.notnull && !pk ? '' : ''}</text><title>${esc(c.name)} · ${esc(c.type)}${c.notnull ? ' · NOT NULL' : ''}${c.comment ? '\n' + esc(c.comment) : ''}</title></g>`;
+    }).join('');
+    const hidden = t.hidden.length ? `<text class="ct" x="34" y="${HH + t.columns.length * RH + 14}">${esc(t.hidden.join(', '))} (${n === 'schema_doc' ? '학생 이름 포함이라 숨김' : '뷰어에서 쓰지 않아 뺌 · DB에는 있음'})</text>` : '';
+    return `<g class="ent L-${L}" data-table="${n}" transform="translate(${b.x},${b.y})" tabindex="0" role="button" aria-label="${n} 테이블 열기"><rect class="body" width="${b.w}" height="${b.h}" rx="6"/><path class="head" d="M0,6 Q0,0 6,0 H${b.w - 6} Q${b.w},0 ${b.w},6 V${HH} H0 Z"/><rect class="strip" width="${b.w}" height="3" rx="1.5"/><text class="tn" x="10" y="21">${n}</text>${t.kind === 'matview' ? `<rect class="mvb" x="${b.w - 22 - (fmt(t.total).length + 1) * 7.2 - 22}" y="10" width="20" height="14" rx="3"/><text class="mv" x="${b.w - 22 - (fmt(t.total).length + 1) * 7.2 - 12}" y="20.5" text-anchor="middle">뷰</text>` : ''}<text class="tc" x="${b.w - 10}" y="21" text-anchor="end">${fmt(t.total)}행</text>${rows}${hidden}<title>${esc(t.comment || n)}</title></g>`;
+  }).join('');
+  const heads = [['원문', '원문 (판독)'], ['정규화', '정규화'], ['출처', '출처 · 성균관의대 스키마·KCD'], ['출처', '출처 · HPO·MONDO·DisMech·LOINC'], ['통합', '통합 · 보조']].map(([l, t], i) => `<text class="colh L-${l}" x="${colX[i]}" y="30">${t}</text>`).join('');
+  el.innerHTML = `<div class="gtiles" style="width:${W}px"><svg class="erdsvg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="지식 DB ERD">${heads}<g class="rels">${lines}</g>${ents}</svg></div>`;
+  ERDG = {lay: {W, H}};
+  el.insertAdjacentHTML('beforebegin', gzBar());  /* 축소·확대·폭 맞춤·전체 */
+  el._s = 1; boxSize(el);
+  const svg = el.querySelector('svg');
+  const info = $('#erdinfo');
+  svg.querySelectorAll('.ent').forEach(g => {
+    const n = g.dataset.table;
+    const on = () => { svg.classList.add('dim'); const rel = new Set([n]); svg.querySelectorAll('.rel').forEach(r => { const hit = r.dataset.from === n || r.dataset.to === n; r.classList.toggle('hot', hit); if (hit) { rel.add(r.dataset.from); rel.add(r.dataset.to); } }); svg.querySelectorAll('.ent').forEach(e => e.classList.toggle('lit', rel.has(e.dataset.table))); info.innerHTML = `<b class="mono">${n}</b> · ${esc(T[n].comment || '')} · 연결된 테이블 ${rel.size - 1}개`; };
+    const off = () => { svg.classList.remove('dim'); svg.querySelectorAll('.rel.hot').forEach(r => r.classList.remove('hot')); info.textContent = '테이블에 마우스를 올리면 연결이 강조되고, 누르면 그 테이블을 엽니다. 빈 곳을 끌면 이동, Ctrl+휠로 확대·축소.'; };
+    g.onmouseenter = g.onfocus = on; g.onmouseleave = g.onblur = off;
+    g.onclick = g.onkeydown = e => { if (e.type === 'click' && GZD.moved) { GZD.moved = false; return; }  /* 끌어서 이동한 뒤의 클릭은 무시 */
+      if (e.type === 'keydown' && e.key !== 'Enter') return; openTable(n); showTab('tables'); };
+  });
+}
+
+/* ── 테이블 탐색: DataGrip 처럼 왼쪽 스키마 트리 · 위 테이블 머리(데이터 | 구조) · 가운데 격자(줄 번호, 머리 눌러 정렬) · 오른쪽 행 상세 ── */
+const st = {table: 'disease', q: '', filters: {}, page: 0, sel: null, view: 'data', sort: null, tq: ''};
+let PAGE = 100;
+const LAYER_KO = {'원문': '원문 (스키마 판독)', '정규화': '정규화', '출처': '출처 (외부·성균관의대)', '통합': '통합', '보조': '보조 (채움·번역·구체화 뷰)'};
+let TREE_OPEN = {}; try { TREE_OPEN = JSON.parse(localStorage.getItem('tree_open') || '{}'); } catch (e) {}
+function renderTree() {
+  const q = st.tq.trim().toLowerCase();
+  $('#tpick').innerHTML = Object.entries(D.layers).map(([layer, names]) => {
+    const ns = names.filter(n => !q || n.includes(q) || (T[n].comment || '').toLowerCase().includes(q)); if (!ns.length) return '';
+    const open = q || TREE_OPEN[layer] !== false;
+    return `<details class="tg L-${layer}"${open ? ' open' : ''} data-layer="${esc(layer)}"><summary><span class="ms" aria-hidden="true">chevron_right</span><span class="lt">${esc(LAYER_KO[layer] || layer)}</span><span class="n">${ns.length}</span></summary>${ns.map(n =>
+      `<button class="ti" data-table="${n}" aria-pressed="${n === st.table}" title="${esc(T[n].comment || n)}"><span class="ms" aria-hidden="true">${T[n].kind === 'table' ? 'table_rows' : 'view_list'}</span><span class="tn">${n}</span><span class="n">${fmt(T[n].total)}</span></button>`).join('')}</details>`;
+  }).join('') || '<div class="empty">찾는 테이블이 없습니다.</div>';
+}
+$('#tpick').onclick = e => { const b = e.target.closest('button[data-table]'); if (b) { sideOpen(false); openTable(b.dataset.table); } };
+$('#tpick').addEventListener('toggle', e => { const d = e.target; if (!d.dataset || !d.dataset.layer || st.tq) return; TREE_OPEN[d.dataset.layer] = d.open; try { localStorage.setItem('tree_open', JSON.stringify(TREE_OPEN)); } catch (er) {} }, true);
+$('#tfind').oninput = e => { st.tq = e.target.value; renderTree(); };
+renderTree();
+const _str = {};
+function rowStr(n, r) { (_str[n] ||= new WeakMap()); let s = _str[n].get(r); if (!s) { s = JSON.stringify(r).toLowerCase(); _str[n].set(r, s); } return s; }
+function facetCols(n) {
+  const t = T[n];
+  return t.columns.filter(c => !t.pk.includes(c.name) && !c.type.endsWith('[]')).map(c => {
+    const cnt = new Map(); t.rows.forEach(r => { const v = val(n, r, c.name); const k = v == null ? '∅' : String(v); cnt.set(k, (cnt.get(k) || 0) + 1); });
+    return {col: c.name, cnt};
+  }).filter(f => f.cnt.size >= 2 && f.cnt.size <= 40).slice(0, 4);
+}
+function openTable(n, filters = {}, selKey = null) {
+  st.table = n; st.q = ''; st.filters = filters; st.page = 0; st.sel = null; st.sort = null;
+  document.querySelectorAll('#tpick button[data-table]').forEach(b => b.setAttribute('aria-pressed', b.dataset.table === n));
+  renderHead(); renderToolbar(); renderRows();
+  if (selKey != null) openRow(n, selKey);
+  else closePanel();
+}
+const fkOf = (n, c) => fkMap[n][c];
+const incoming = n => { const out = []; NAMES.forEach(s => Object.entries(fkMap[s]).forEach(([col, f]) => { if (f.table === n) out.push([s, col, f]); })); return out; };
+function renderHead() {
+  const n = st.table, t = T[n], inc = incoming(n);
+  $('#dbhead').innerHTML = `<div class="th1"><span class="ms" aria-hidden="true">${t.kind === 'table' ? 'table_rows' : 'view_list'}</span><b class="mono">${n}</b><span class="kind">${t.kind === 'table' ? '테이블' : '구체화 뷰'}</span><span class="muted">${fmt(t.total)}행 · 열 ${t.columns.length}${t.rows.length < t.total ? ` · 미리보기 ${fmt(t.rows.length)}행` : ''}</span></div>${t.comment ? `<div class="tcom" title="${esc(t.comment)}">${esc(t.comment)}</div>` : '<div class="tcom">&nbsp;</div>'}
+    <div class="vtabs" role="tablist"><button role="tab" data-view="data" aria-selected="${st.view === 'data'}">데이터</button><button role="tab" data-view="cols" aria-selected="${st.view === 'cols'}">구조 <span class="n">열 ${t.columns.length} · 참조 ${t.fks.length + inc.length}</span></button></div>`;
+  $('#dbhead').querySelectorAll('[data-view]').forEach(b => b.onclick = () => { st.view = b.dataset.view; renderHead(); renderToolbar(); renderRows(); });
+}
+function renderToolbar() {
+  const n = st.table;
+  if (st.view !== 'data') { $('#toolbar').innerHTML = ''; return; }
+  const fcs = facetCols(n), shown = new Set(fcs.map(f => f.col));
+  const facets = fcs.map(f => `<label class="fsel"><span class="mono">${f.col}</span><select data-facet="${f.col}"><option value="">전체</option>${[...f.cnt].sort((a, b) => b[1] - a[1]).map(([k, c]) => `<option value="${esc(k)}"${st.filters[f.col] === k ? ' selected' : ''}>${esc(short(k === '∅' ? '<null>' : k, 28))} (${c})</option>`).join('')}</select></label>`).join('');
+  const chips = Object.entries(st.filters).filter(([c]) => !shown.has(c)).map(([c, v]) => `<span class="chip mono">${c} = ${esc(short(v, 30))}<button data-unfilter="${c}" aria-label="필터 해제">${ic('close')}</button></span>`).join('');
+  $('#toolbar').innerHTML = `<label class="search sm wide"><span class="ms" aria-hidden="true">filter_alt</span><input id="q" type="search" placeholder="필터: 모든 칸에서 찾기" value="${esc(st.q)}" aria-label="모든 칸에서 찾기"></label>${facets}${chips}`;
+  $('#q').oninput = e => { st.q = e.target.value; st.page = 0; renderRows(); };
+  $('#toolbar').querySelectorAll('select[data-facet]').forEach(s => s.onchange = () => { if (s.value) st.filters[s.dataset.facet] = s.value; else delete st.filters[s.dataset.facet]; st.page = 0; renderRows(); });
+  $('#toolbar').querySelectorAll('[data-unfilter]').forEach(b => b.onclick = () => { delete st.filters[b.dataset.unfilter]; renderToolbar(); renderRows(); });
+}
+function filtered() {
+  const n = st.table, q = st.q.trim().toLowerCase();
+  const rows = T[n].rows.filter(r => Object.entries(st.filters).every(([c, v]) => { const x = val(n, r, c); return v === '∅' ? x == null : String(x) === v; }) && (!q || rowStr(n, r).includes(q)));
+  if (st.sort) { const i = colIx[n][st.sort.col], d = st.sort.dir;
+    rows.sort((a, b) => { const p = a[i], q2 = b[i]; if (p == null) return q2 == null ? 0 : 1; if (q2 == null) return -1; return (typeof p === 'number' && typeof q2 === 'number' ? p - q2 : String(p).localeCompare(String(q2), 'ko', {numeric: true})) * d; }); }
+  return rows;
+}
+const NUL = '<span class="nul">&lt;null&gt;</span>';
+function cell(n, c, v) {
+  if (v == null) return `<td>${NUL}</td>`;
+  if (Array.isArray(v)) { const t = v.map(String).join(', '); return `<td class="arrc" title="${esc(t)}">${v.length ? `<span class="br">[</span>${esc(short(t, 80))}<span class="br">]</span>` : '<span class="nul">[]</span>'}</td>`; }
+  const f = fkOf(n, c.name);
+  if (f) { const tr = byPk(f.table, v), lb = tr && f.table !== n ? label(f.table, tr) : ''; return `<td title="${esc(lb ? `${f.table} → ${lb}` : f.table)}"><button class="fk" data-goto="${f.table}" data-key="${esc(v)}">${esc(v)}</button>${lb && lb !== String(v) ? `<span class="fkl">${esc(short(lb, 40))}</span>` : ''}</td>`; }
+  const num = typeof v === 'number', sv = String(v);
+  return `<td class="${num ? 'num' : typeof v === 'boolean' ? 'bool' : ''}"${sv.length > 60 ? ` title="${esc(sv)}"` : ''}>${esc(short(sv, 90))}</td>`;
+}
+function renderRows() {
+  const n = st.table, t = T[n];
+  if (st.view === 'cols') { renderCols(); return; }
+  const rows = filtered(), pages = Math.max(1, Math.ceil(rows.length / PAGE)); st.page = Math.min(st.page, pages - 1);
+  const off = st.page * PAGE, slice = rows.slice(off, off + PAGE);
+  const sortIc = c => st.sort && st.sort.col === c ? `<span class="srt">${st.sort.dir > 0 ? '▲' : '▼'}</span>` : '';
+  const head = `<tr><th class="rn">#</th>${t.columns.map(c => `<th data-sort="${c.name}" title="${esc((c.comment ? c.comment + ' · ' : '') + '눌러 정렬')}"><span class="hc">${t.pk.includes(c.name) ? `<span class="ms k" title="기본키">key</span>` : fkOf(n, c.name) ? `<span class="ms l" title="외래키 → ${esc(fkOf(n, c.name).table)}">link</span>` : ''}${c.name}${sortIc(c.name)}</span><small>${esc(c.type)}</small></th>`).join('')}</tr>`;
+  $('#tablewrap').innerHTML = slice.length ? `<table><thead>${head}</thead><tbody>${slice.map((r, i) => `<tr data-key="${esc(pkOf(n, r))}" class="${st.sel === pkOf(n, r) ? 'on' : ''}"><td class="rn">${off + i + 1}</td>${t.columns.map(c => cell(n, c, val(n, r, c.name))).join('')}</tr>`).join('')}</tbody></table>` : `<div class="empty">조건에 맞는 행이 없습니다.</div>`;
+  $('#tablewrap').querySelectorAll('th[data-sort]').forEach(th => th.onclick = () => { const c = th.dataset.sort; st.sort = !st.sort || st.sort.col !== c ? {col: c, dir: 1} : st.sort.dir > 0 ? {col: c, dir: -1} : null; st.page = 0; renderRows(); });
+  const range = rows.length ? `${fmt(off + 1)}–${fmt(off + slice.length)}` : '0';
+  $('#pager').innerHTML = `<span class="pinfo">${range} / ${fmt(rows.length)}행${rows.length !== t.rows.length ? ` <span class="muted">(필터 전 ${fmt(t.rows.length)})</span>` : ''}${t.total > t.rows.length ? ` <span class="muted">· DB 전체 ${fmt(t.total)}행 중 미리보기</span>` : ''}</span>
+    <span class="pbtns"><button id="pf" ${st.page ? '' : 'disabled'} aria-label="처음">${ic('first_page')}</button><button id="pv" ${st.page ? '' : 'disabled'} aria-label="이전">${ic('chevron_left')}</button><span class="pg">${st.page + 1} / ${pages}</span><button id="nx" ${st.page < pages - 1 ? '' : 'disabled'} aria-label="다음">${ic('chevron_right')}</button><button id="pl" ${st.page < pages - 1 ? '' : 'disabled'} aria-label="마지막">${ic('last_page')}</button>
+    <select id="psz" aria-label="한 쪽 행 수">${[50, 100, 200, 500].map(k => `<option value="${k}"${k === PAGE ? ' selected' : ''}>${k}행씩</option>`).join('')}</select></span>`;
+  $('#pf').onclick = () => { st.page = 0; renderRows(); }; $('#pl').onclick = () => { st.page = pages - 1; renderRows(); };
+  $('#pv').onclick = () => { st.page--; renderRows(); }; $('#nx').onclick = () => { st.page++; renderRows(); };
+  $('#psz').onchange = e => { PAGE = +e.target.value; st.page = Math.floor(off / PAGE); renderRows(); };
+}
+/* 구조: 열 이름·타입·키·참조·설명, 그리고 이 테이블을 가리키는 열 */
+function renderCols() {
+  const n = st.table, t = T[n], inc = incoming(n);
+  const rows = t.columns.map((c, i) => { const f = fkOf(n, c.name);
+    return `<tr><td class="rn">${i + 1}</td><td class="mono">${t.pk.includes(c.name) ? `<span class="ms k">key</span>` : f ? `<span class="ms l">link</span>` : ''}${c.name}</td><td class="mono ty">${esc(c.type)}</td><td>${t.pk.includes(c.name) ? 'PK' : ''}</td><td>${f ? `<button class="fk mono" data-gotable="${f.table}">${f.table}.${f.refcol}</button>${f.virtual ? ' <span class="muted">(이름 연결)</span>' : ''}` : ''}</td><td class="cm">${esc(c.comment || '')}</td></tr>`; }).join('');
+  const hid = (t.hidden || []).length ? `<p class="muted" style="margin:8px 2px 0;font-size:13px">내보내지 않은 열: <span class="mono">${t.hidden.map(esc).join(', ')}</span></p>` : '';
+  const incH = inc.length ? `<h4 class="dgh">이 테이블을 가리키는 열 ${inc.length}</h4><div class="tablewrap dg"><table><thead><tr><th>테이블</th><th>열</th><th>→ 이 테이블의 열</th><th>종류</th></tr></thead><tbody>${inc.map(([s, col, f]) => `<tr><td><button class="fk mono" data-gotable="${s}">${s}</button></td><td class="mono">${col}</td><td class="mono">${f.refcol}</td><td>${f.virtual ? '이름 연결 (구체화 뷰)' : '외래키'}</td></tr>`).join('')}</tbody></table></div>` : '';
+  $('#tablewrap').innerHTML = `<table><thead><tr><th class="rn">#</th><th>열</th><th>타입</th><th>키</th><th>참조</th><th>설명</th></tr></thead><tbody>${rows}</tbody></table>`;
+  $('#pager').innerHTML = `<div class="colsx">${hid}${incH}</div>`;
+}
+document.addEventListener('click', e => { const b = e.target.closest('[data-gotable]'); if (!b) return; st.view = 'data'; openTable(b.dataset.gotable); });
+$('#tablewrap').addEventListener('click', e => {
+  if (e.target.closest('[data-goto]')) return;
+  const tr = e.target.closest('tr[data-key]'); if (tr) openRow(st.table, tr.dataset.key);
+});
+document.addEventListener('click', e => {
+  const g = e.target.closest('[data-goto]'); if (!g) return;
+  e.preventDefault();
+  if (g.dataset.filter) { openTable(g.dataset.goto, {[g.dataset.filter]: g.dataset.key}); showTab('tables'); return; }
+  openTable(g.dataset.goto, {}, g.dataset.key); showTab('tables');
+  const r = byPk(g.dataset.goto, g.dataset.key);
+  if (r) { const rows = filtered(), i = rows.indexOf(r); if (i >= 0) { st.page = Math.floor(i / PAGE); renderRows(); } }
+});
+function closePanel() { $('#panel').hidden = true; $('#split').classList.add('nopanel'); st.sel = null; document.querySelectorAll('#tablewrap tr.on').forEach(x => x.classList.remove('on')); }
+function openRow(n, key) {
+  st.sel = key;
+  document.querySelectorAll('#tablewrap tr').forEach(x => x.classList.toggle('on', x.dataset.key === key));
+  $('#panel').innerHTML = rowPanel(n, key);
+  $('#panel').hidden = false; $('#split').classList.remove('nopanel');
+  $('#panel').querySelector('[data-close]').onclick = closePanel;
+}
+function rowPanel(n, key) {
+  const t = T[n], r = byPk(n, key);
+  if (!r) return `<div class="ph"><b>${n}</b><button data-close aria-label="닫기">${ic('close')}</button></div><p class="muted">행을 찾지 못했습니다: ${esc(key)}</p>`;
+  let h = `<div class="ph"><div><div class="mono muted" style="font-size:12px">${n} · 행 상세</div><b>${esc(label(n, r))}</b></div><button data-close aria-label="닫기" title="닫기">${ic('close')}</button></div><dl>`;
+  t.columns.forEach(c => {
+    const v = val(n, r, c.name);
+    let s = v == null ? NUL : Array.isArray(v) ? (v.length ? v.map(x => `<span class="arr">${esc(x)}</span>`).join('') : '<span class="null">빈 배열</span>') : fkMap[n][c.name] ? fkButton(n, c.name, v, (() => { const tr = byPk(fkMap[n][c.name].table, v); return tr ? `${v} · ${short(label(fkMap[n][c.name].table, tr), 50)}` : v; })()) : esc(v);
+    h += `<dt title="${esc(c.comment || '')}">${c.name}</dt><dd>${s}</dd>`;
+  });
+  h += '</dl>';
+  /* 계보: 스키마 상자의 조상 가지 */
+  const nodeId = n === 'schema_node' ? val(n, r, 'id') : n === 'node_concept' ? val(n, r, 'node_id') : null;
+  if (nodeId != null) {
+    const chain = []; let cur = byPk('schema_node', nodeId);
+    while (cur) { chain.unshift(cur); const p = val('schema_node', cur, 'parent_id'); cur = p == null ? null : byPk('schema_node', p); }
+    const doc = byPk('schema_doc', val('schema_node', chain[0], 'doc_id'));
+    h += `<h4>스키마 속 위치</h4><div class="crumbs">${doc ? `<div>${fkButton('schema_node', 'doc_id', val('schema_doc', doc, 'id'), label('schema_doc', doc))}</div>` : ''}${chain.map((c, i) => `<div style="padding-left:${i * 10}px"><span class="r">${ROLE_KO[val('schema_node', c, 'role')]}</span>${fkButton('schema_node', 'parent_id', val('schema_node', c, 'id'), short(val('schema_node', c, 'text'), 60))}</div>`).join('')}</div>`;
+  }
+  /* 이 행을 가리키는 행 */
+  if (t.pk.length === 1) {
+    const pk = val(n, r, t.pk[0]); let inc = '';
+    NAMES.forEach(s => Object.entries(fkMap[s]).forEach(([col, f]) => {
+      if (f.table !== n || f.refcol !== t.pk[0]) return;
+      const rows = byCol(s, col, pk); if (!rows.length) return;
+      const tag = s === n ? `${col} (자기 참조)` : `${s}.${col}`;
+      inc += `<h4>${esc(tag)} · ${rows.length}행 ${f.virtual ? '<span class="badge L-통합">통합</span>' : ''}</h4><ul class="reflist">${rows.slice(0, 8).map(x => `<li><button class="fk" data-goto="${s}" data-key="${esc(pkOf(s, x))}">${esc(short(label(s, x), 64))}</button></li>`).join('')}</ul>${rows.length > 8 || T[s].pk.length !== 1 ? `<button class="fk more" data-goto="${s}" data-filter="${col}" data-key="${esc(pk)}">${s}에서 ${rows.length}행 모두 보기</button>` : ''}`;
+    }));
+    h += inc ? `<h4 style="margin-top:18px;color:var(--ink)">이 행을 가리키는 행</h4>${inc}` : `<h4>이 행을 가리키는 행</h4><p class="muted" style="margin:0;font-size:12.5px">없습니다.</p>`;
+  }
+  return h;
+}
+
+/* ── 관계 그래프: 질병·소견·기전 하나를 가운데 두고 이웃만 그린다. 열은 늘 소견 | 기전 | 질병 ── */
+const KIND_KO = {symptom: '증상', sign: '징후', lab: '검사', imaging: '영상', test: '검사', history: '병력'};
+const x = {mode: 'disease', id: null, view: null, q: '', all: false, hist: [], fwd: [], path: []};  /* hist·fwd = 뒤로·앞으로 기록, path = 처음 고른 노드에서 지금까지의 깊이 (되돌아오면 잘림) */
+const group = (n, key) => { const m = new Map(); T[n].rows.forEach(r => { const k = val(n, r, key); (m.get(k) || m.set(k, []).get(k)).push(r); }); return m; };
+const PRf = new Map(); T.presentation.rows.forEach(r => { const f = val('presentation', r, 'finding_id'); if (f) (PRf.get(f) || PRf.set(f, []).get(f)).push(r); });
+/* 병명: KCD 4자리 아래 MONDO 질병. 노드 ID는 'E830@MONDO:0010200' (코드@MONDO) */
+/* 코드 이름과 한국어 이름이 똑같은 병명(담관염 = K83.0 담관염)은 그 코드와 같은 병이라, 그래프에서는 코드 노드 하나로 합친다 (SAME).
+   ENTS(코드의 병명 탭)에는 이름이 다른 병명만 둔다. 합친 병명은 ENT_SAME 에 남겨 '자세히'에 보인다 */
+const ENT = new Map(), ENTS = new Map(), SAME = new Set(), ENT_SAME = new Map();
+const kcdKo = c => { const r = byPk('disease', c); return r ? val('disease', r, 'name_ko') : ''; }, normKo = z => String(z || '').replace(/\s+/g, '');
+T.kcd_entity.rows.forEach(r => { const c = val('kcd_entity', r, 'kcd'), m = val('kcd_entity', r, 'mondo_id'), k = c + '@' + m;
+  ENT.set(k, {kcd: c, mondo: m, ko: val('kcd_entity', r, 'name_ko'), en: val('kcd_entity', r, 'name_en'), src: val('kcd_entity', r, 'name_src'), how: val('kcd_entity', r, 'method')});
+  if (normKo(ENT.get(k).ko) === normKo(kcdKo(c))) { SAME.add(k); (ENT_SAME.get(c) || ENT_SAME.set(c, []).get(c)).push(k); }
+  else (ENTS.get(c) || ENTS.set(c, []).get(c)).push(k); });
+const isEnt = k => String(k).includes('@'), entCode = k => String(k).split('@')[0];
+const canonD = k => SAME.has(k) ? entCode(k) : k;  /* 그래프 노드 키: 합친 병명은 코드로 */
+/* 병명이 KCD 코드에 붙은 방법 · 한국어 이름 출처. AI 가 옮기거나 번역한 것은 의학과 검수 전 */
+const HOW_KO = h => ({icd10_xref: 'ICD-10 교차참조', name_label: '이름 일치', name_synonym: '동의어 일치', ai_place: 'AI가 세부 코드로 옮김 (검수 전)'}[h] || h || '');
+const SRCN_KO = s => s === 'AI 번역' ? 'AI 번역 (검수 전)' : (s || '');
+const soleEnt = c => (ENTS.get(c) || []).length === 1 && !ENT_SAME.has(c);  /* 병명이 하나뿐인 코드: 코드에 남은 연결을 그 병명이 물려받는다 */
+const nm = {
+  D: k => { if (isEnt(k)) return (ENT.get(k) || {}).ko || k; const r = byPk('disease', k); return r ? val('disease', r, 'name_ko') : k; },
+  F: f => { const r = byPk('finding', f); return r ? val('finding', r, 'name_ko') : f; },
+  M: m => { const r = byPk('mechanism', m); return r ? val('mechanism', r, 'name_ko') : m; },
+};
+const mParent = m => val('mechanism', byPk('mechanism', m), 'parent');
+
+/* 왼쪽 목록 */
+const ALLK = [...T.disease.rows.map(r => val('disease', r, 'kcd')).filter(k => k.length <= 4), ...[...ENT.keys()].filter(k => !SAME.has(k))];  /* KCD 3·4자리 코드 + 병명 */
+/* 이 질병(코드 또는 병명)의 기전 그래프에 나오는 소견 수: 직접 이어진 것 + 기전을 거쳐 닿는 것. 필터에 따라 달라져 필터별로 기억한다 */
+const FC = new Map();
+function findCount(k) {
+  const key = [xf.sub, xf.hpoa, xf.fillA, xf.fillB, xf.hyp].map(Number).join('') + k;
+  if (FC.has(key)) return FC.get(key);
+  const set = new Set();
+  (isEnt(k) ? [k] : [k, ...(ENTS.get(k) || [])]).forEach(z => reachTree('D|' + z, 1).nodes.forEach(n => { if ('FH'.includes(n[0])) set.add(n); }));
+  FC.set(key, set.size); return set.size;
+}
+const mechDis = m => new Set((GI.get('M|' + m) || []).filter(e => e.s[0] === 'D').map(e => e.s)).size;  /* 이 기전을 일으키는 질병 수 */
+function listItems() {
+  const q = x.q.trim().toLowerCase(), has = s => s && String(s).toLowerCase().includes(q);
+  let items;
+  if (x.mode === 'disease') {
+    /* 질병은 KCD 코드 한 줄로. 병명(윌슨병·멘케스병)은 코드 화면의 탭으로 고른다 */
+    const code = k => entCode(k), linked = [...new Set([...[...SKREF.keys()].filter(k => k[0] === 'D').map(k => code(k.slice(2))), ...[...KP.keys()].map(code),
+      ...[...GO.keys()].filter(k => k[0] === 'D' && GO.get(k).some(e => e.p === 'has_phenotype')).map(k => code(k.slice(2)))])];  /* 원문 근거 채우기처럼 코드에 바로 붙은 표현형도 */
+    items = (q ? [...new Set([...ALLK.filter(k => !isEnt(k)), ...linked])] : linked).map(k => {
+      const ents = ENTS.get(k) || [], sch = new Set([...(SKREF.get('D|' + k) || []), ...ents.flatMap(e => [...(SKREF.get('D|' + e) || [])])]).size;
+      const ex = ents.reduce((a, e) => a + (KP.get(e) || []).length, 0);
+      return {id: k, kind: 'D', code: dotted(k), name: nm.D(k), en: en.D(k), sch, ex, ents, mk: mechKind(k), score: sch * 100000 + ex};
+    });
+  } else if (x.mode === 'finding') {
+    items = T.finding.rows.map(r => { const f = val('finding', r, 'id'); const ds = new Set((GI.get('F|' + f) || []).filter(e => e.s[0] === 'D').map(e => e.s)); (KPf.get(f) || []).forEach(z => ds.add('D|' + canonD(entKey(z)))); return {id: f, kind: 'F', code: KIND_KO[val('finding', r, 'kind')], name: val('finding', r, 'name_ko'), en: val('finding', r, 'name_en'), score: 1e6 + ds.size + (PRf.has(f) ? 1e5 : 0), sub: PRf.has(f) ? '주호소' : ds.size ? `질병 ${ds.size}` : ''}; });
+    KPh.forEach((rs, h) => { if (HPO2F.has(h)) return; const n = new Set(rs.map(entKey)).size; items.push({id: h, kind: 'H', code: 'HPO', name: nm.H(h), en: en.H(h), score: n, sub: `질병 ${n}`}); });
+  } else if (x.mode === 'mechanism') {
+    items = T.mechanism.rows.map(r => { const m = val('mechanism', r, 'id'); return {id: m, kind: 'M', code: 'SKKU', name: val('mechanism', r, 'name_ko'), en: val('mechanism', r, 'name_en'), score: 1e6 + mechDis(m), sub: `질병 ${mechDis(m)}`}; });
+    DMm.forEach(m => { if (dmTerm(m.id)) return; const n = new Set((DMD.mondo2kcd[m.mondo] || []).map(z => z[0])).size; items.push({id: m.id, kind: 'X', code: 'DM', name: m.ko || m.en, en: m.ko ? m.en : '', score: (DMtoH.get(m.id) || []).length + (DMout.get(m.id) || []).length, sub: `질병 ${n}`}); });
+  } else {
+    items = [];
+    GO.forEach((es, id) => { if (id[0] !== 'A') return; const a = id.slice(2), n = new Set(es.map(e => e.o)).size, vs = ANV.get(a) || []; items.push({id: a, kind: 'A', code: '검사', name: nm.A(a), en: en.A(a), score: n, sub: `세부 ${vs.length}종 · 소견 ${n}`, more: vs.map(c => c + ' ' + LOINC[c][0] + ' ' + (LOINC[c][1] || '')).join(' ')}); });
+  }
+  if (q && x.mode === 'disease') items.forEach(i => { const e = (i.ents || []).find(k => has(nm.D(k)) || has(en.D(k))); if (e) { i.tab = e; i.hit = [nm.D(e), e, '병명']; } if (e || has(i.id) || has(i.code) || has(i.name) || has(i.en)) return; const a = ((window.DB_ALIAS || {})[i.id] || []).find(z => has(z[0]) || has(z[1])); if (a) i.hit = a; });
+  if (q) items = items.filter(i => i.hit || has(i.id) || has(i.code) || has(i.name) || has(i.en) || has(i.more));
+  if (x.mode === 'disease') items.forEach(i => { i.fc = findCount(i.id); i.score = i.fc; });  /* 연결 많은 순 = 연결된 소견 많은 순 */
+  if (q && x.mode === 'disease') items.forEach(i => { i.exact = (i.id.toLowerCase() === q.replace(/\./g, '') || String(i.code).toLowerCase() === q) ? 1 : 0; });
+  const byName = (a, b) => a.name.localeCompare(b.name, 'ko'), byCode = (a, b) => String(a.code || '').localeCompare(String(b.code || ''), 'en', {numeric: true}) || String(a.id).localeCompare(String(b.id), 'en', {numeric: true});
+  const cmp = x.sort === 'code' ? byCode : x.sort === 'name' ? byName : (a, b) => b.score - a.score || byName(a, b);
+  return items.sort((a, b) => (b.exact || 0) - (a.exact || 0) || (q ? !!a.hit - !!b.hit : 0) || cmp(a, b));  /* 검색 중에는 이름이 직접 맞는 것 먼저, 별칭으로 걸린 것은 뒤로 */
+}
+const LIST_PAGE = 500;  /* 처음에 보여 줄 줄 수 (끝에 가까워지면 더 붙인다) */
+const ALIAS_KO = {'포함': '포함', '세부': '세부 코드', '스키마': '성균관의대 표기', 'MONDO': 'MONDO', '병명': '병명'};
+const hitTxt = h => `${ALIAS_KO[h[2]] || h[2]}: ${h[0]}`;
+const MK_TAG = {draft: ['AI', 'DisMech·스키마 기전이 없어 AI(Claude)가 쓴 기전으로 채움 (검수 전)'], gene: ['유전자만', 'DisMech·스키마 기전이 없어 원인 유전자 → GO 과정만 자동으로 이음'], '': ['기전 없음', 'DisMech·스키마 기전도, 채움도 없음. 질병 → 소견(표현형)만 이어져 있음']};
+const cntCell = pairs => `<span class="cnt">${pairs.filter(Boolean).map(([n, l, tip]) => `<span title="${esc(tip || '')}"><b>${typeof n === 'number' ? fmt(n) : esc(n)}</b>${esc(l)}</span>`).join('') || '<span class="none">연결 없음</span>'}</span>`;
+const listRow = i => {
+  const dz = x.mode === 'disease', nE = (i.ents || []).length;
+  const tag = dz && i.kind === 'D' && i.mk !== 'mech' && (i.ex || i.sch) ? MK_TAG[i.mk || ''] : null;
+  const cnt = dz ? cntCell([i.fc ? [i.fc, '소견', `이 질병의 기전 그래프에 나오는 소견(증상·징후·검사 이상) ${i.fc}개 · 직접 연결 + 기전을 거쳐 닿는 것`] : null]) : '';
+  return `<button class="li" data-id="${esc(i.id)}" data-kind="${i.kind}"${i.tab ? ` data-tab="${esc(i.tab)}"` : ''} aria-pressed="${i.id === x.id && i.kind === x.cur}"><span class="code"><span class="mono">${esc(i.code || '')}</span>${tag ? `<small class="mk mk-${i.mk || 'none'}" title="${esc(tag[1])}">${tag[0]}</small>` : ''}</span><span class="dn">${bi(i.name, i.en)}${i.hit ? `<span class="hit">${esc(hitTxt(i.hit))}</span>` : ''}</span>${dz ? cnt : `<span class="cnt"><span>${esc(i.sub || '연결 없음')}</span></span>`}</button>`;
+};
+function renderList() {
+  const items = listItems(), key = [x.mode, x.q || '', x.sort].join('\u0001'), el = $('#xlist'), same = x.lkey === key, st = el.scrollTop;
+  x.lkey = key; x.litems = items; if (!same) x.lshown = LIST_PAGE;
+  $('#xq').placeholder = {disease: '질병명이나 KCD 코드', finding: '소견·HPO 표현형 (한·영)', mechanism: '기전 (스키마·DisMech, 한·영)', test: '검사 이름이나 LOINC 코드'}[x.mode];
+  $('#xcount').textContent = `${fmt(items.length)}개`;
+  $('#xcount').title = x.mode === 'disease' ? '소견 = 이 질병의 기전 그래프에 나오는 소견 수 (직접 연결 + 기전을 거쳐 닿는 것)' : '';
+  el.innerHTML = items.length ? items.slice(0, x.lshown).map(listRow).join('') : '<div class="empty">찾는 항목이 없습니다.</div>';
+  el.scrollTop = same ? st : 0;
+  fillList();
+}
+/* 목록 끝에 가까워지면 다음 묶음을 붙인다 */
+function fillList() {
+  const el = $('#xlist');
+  if (!el.clientHeight || !x.litems) return;
+  while (x.lshown < x.litems.length && el.scrollHeight - el.scrollTop - el.clientHeight < 600) {
+    el.insertAdjacentHTML('beforeend', x.litems.slice(x.lshown, x.lshown + LIST_PAGE).map(listRow).join(''));
+    x.lshown += LIST_PAGE;
+  }
+}
+document.querySelectorAll('#xseg button').forEach(b => b.onclick = () => { x.mode = b.dataset.mode; document.querySelectorAll('#xseg button').forEach(z => z.setAttribute('aria-pressed', z === b)); renderList(); });
+let aliasLoading = false;
+function needAlias() {
+  if (window.DB_ALIAS || aliasLoading) return;
+  aliasLoading = true;
+  const sc = document.createElement('script'); sc.src = 'search.js';
+  sc.onload = () => { if (x.q) renderList(); };
+  sc.onerror = () => { aliasLoading = false; };
+  document.head.appendChild(sc);
+}
+/* 목록에서 고른 줄만 바꿔 표시 (노드를 따라갈 때 2천여 줄을 다시 만들지 않는다) */
+function syncListSel() { document.querySelectorAll('#xlist button[aria-pressed="true"]').forEach(b => b.setAttribute('aria-pressed', 'false')); const b = [...document.querySelectorAll('#xlist button.li')].find(b => b.dataset.id === x.id && b.dataset.kind === x.cur); if (b) b.setAttribute('aria-pressed', 'true'); }
+try { x.sort = localStorage.getItem('xsort') || 'score'; } catch (e) { x.sort = 'score'; }
+$('#xsort').value = x.sort;
+$('#xsort').onchange = e => { x.sort = e.target.value; try { localStorage.setItem('xsort', x.sort); } catch (er) {} renderList(); };
+$('#xq').oninput = e => { x.q = e.target.value; if (x.q.trim() && x.mode === 'disease') needAlias(); renderList(); };
+$('#xlist').addEventListener('scroll', fillList, {passive: true});
+$('#xlist').onclick = e => { const b = e.target.closest('button[data-id]'); if (b) { sideOpen(false); focusOn(b.dataset.kind, b.dataset.tab || b.dataset.id, true); } };  /* 목록에서 고르면 뒤로가기 길을 새로 시작 */  /* 병명으로 찾았으면 그 병명 탭을 연다 */
+
+/* HPO 표현형 (kcd_phenotype: HPOA·Orphadata·DisMech) */
+const entKey = r => val('entity_phenotype', r, 'kcd') + '@' + val('entity_phenotype', r, 'mondo_id');
+const KP = new Map(); T.entity_phenotype.rows.forEach(r => { const k = canonD(entKey(r)); (KP.get(k) || KP.set(k, []).get(k)).push(r); });
+const HL = D.hpo_labels || {}, ML = D.mondo_labels || {};
+nm.H = h => (HL[h] && (HL[h][1] || HL[h][0])) || h;
+const en = {  /* 영어 원문 */
+  D: k => { if (isEnt(k)) return (ENT.get(k) || {}).en || ''; const r = byPk('disease', k); return r ? val('disease', r, 'name_en') : ''; },
+  F: f => { const r = byPk('finding', f); return r ? val('finding', r, 'name_en') || '' : ''; },
+  M: m => { const r = byPk('mechanism', m); return r ? val('mechanism', r, 'name_en') || '' : ''; },
+  H: h => (HL[h] && HL[h][0]) || '',
+};
+const mondoKo = m => (ML[m] && (ML[m][1] || ML[m][0])) || m, mondoEn = m => (ML[m] && ML[m][0]) || '';
+const bi = (ko, e) => `<span class="ko">${esc(ko)}</span>${e && e !== ko ? `<span class="en">${esc(e)}</span>` : ''}`;
+const xf = {sub: true, hpoa: true, all: false, fillA: true, fillB: true, hyp: false};
+const SRC_KO = {dismech: 'DisMech', orphadata: 'Orphadata', hpoa: 'HPOA'};
+const FREQ_KO = v => v == null ? '빈도 없음' : v >= 0.99 ? '항상' : v >= 0.8 ? '매우 흔함' : v >= 0.3 ? '흔함' : v >= 0.05 ? '가끔' : v > 0 ? '드묾' : '빈도 없음';
+const kv = (r, c) => val('entity_phenotype', r, c);
+const extBest = r => { const v = ['f_dismech', 'f_orphadata', 'f_hpoa'].map(c => kv(r, c)).filter(z => z != null); return v.length ? Math.max(...v) : null; };
+const extScore = r => (extBest(r) ?? 0.1) + (kv(r, 'min_depth') === 0 ? 0.6 : 0) + 0.15 * (kv(r, 'sources') || []).length + (kv(r, 'diagnostic') ? 0.3 : 0);
+const extRows = k => (KP.get(k) || []).filter(r => (xf.sub || kv(r, 'min_depth') === 0) && (xf.hpoa || !kv(r, 'deny_only')));
+function extChips(rows) {  // 여러 HPO 행을 출처별 최대 빈도로 묶어 보인다
+  const agg = {}; let d0 = false, dx = false;
+  rows.forEach(r => { [['dismech', 'f_dismech'], ['orphadata', 'f_orphadata'], ['hpoa', 'f_hpoa']].forEach(([s, c]) => { if ((kv(r, 'sources') || []).includes(s)) agg[s] = Math.max(agg[s] ?? -1, kv(r, c) ?? -1); }); d0 ||= kv(r, 'min_depth') === 0; dx ||= !!kv(r, 'diagnostic'); });
+  return Object.entries(agg).map(([s, v]) => `<span class="ev ext${s === 'hpoa' ? ' deny' : ''}" title="${s === 'hpoa' ? '제출본에서 빠지는 출처' : ''}">${SRC_KO[s]} · ${FREQ_KO(v < 0 ? null : v)}</span>`).join('') + (d0 ? '' : '<span class="ev subd">하위 질병에서</span>') + (dx ? '<span class="ev dir">진단적</span>' : '');
+}
+
+/* DisMech 기전: 기전 → 다음 기전·표현형, 질병(MONDO) → KCD */
+const DMD = D.dismech || {mechs: [], edges: [], mondo2kcd: {}, labels: {}};
+const push = (m, k, v) => (m.get(k) || m.set(k, []).get(k)).push(v);
+const DMm = new Map(DMD.mechs.map(r => [String(r[0]), {id: String(r[0]), mondo: r[1], en: r[2], ko: r[3], stage: r[4], depth: r[5], go: r[6] || [], gm: r[7] || []}]));
+const GOL = DMD.go || {}, goName = g => (GOL[g] && (GOL[g][1] || GOL[g][0])) || g, goEn = g => (GOL[g] && GOL[g][1] ? GOL[g][0] : '');
+const MOD_KO = {INCREASED: '↑', DECREASED: '↓', ABNORMAL: '이상', ABSENT: '없음', PRESENT: '있음', ALTERED: '변화'};
+const DMout = new Map(), DMin = new Map(), DMtoH = new Map(), HtoDM = new Map();
+DMD.edges.forEach(([a, bm, bh]) => { a = String(a); if (bm != null) { push(DMout, a, String(bm)); push(DMin, String(bm), a); } if (bh) { push(DMtoH, a, bh); push(HtoDM, bh, a); } });
+const DMk = new Map();
+DMm.forEach(m => (DMD.mondo2kcd[m.mondo] || []).forEach(([k, e, d]) => push(DMk, k + '@' + e, [m.id, d])));
+nm.X = i => { const m = DMm.get(i); return m ? (m.ko || m.en) : i; };
+en.X = i => { const m = DMm.get(i); return m ? m.en : ''; };
+const dmDisease = i => { const m = DMm.get(i), l = m && DMD.labels[m.mondo]; return l ? (l[1] || l[0]) : (m ? m.mondo : ''); };
+const KPh = group('entity_phenotype', 'hpo_id'), KPf = group('entity_phenotype', 'finding_id');
+const HPO2F = new Map(T.finding.rows.filter(r => val('finding', r, 'hpo_id')).map(r => [val('finding', r, 'hpo_id'), val('finding', r, 'id')]));
+const hNode = h => HPO2F.has(h) ? 'F|' + HPO2F.get(h) : 'H|' + h;
+const kpOk = r => (xf.sub || kv(r, 'min_depth') === 0) && (xf.hpoa || !kv(r, 'deny_only'));
+const xLink = (i, k) => (DMD.mondo2kcd[(DMm.get(i) || {}).mondo] || []).some(z => z[0] + '@' + z[1] === k || z[0] === k);
+
+/* ── 방향 그래프: 모든 간선은 인과 방향(원인 → 결과). 열은 원인 | 질병 | 기전 | 소견 | 검사 ── */
+const PRED = {
+  causes: {ko: '일으킴', css: 'p-causes'},
+  manifests_as: {ko: '나타남', css: 'p-manifest'},
+  constitutes: {ko: '이룸', css: 'p-const'},
+  has_phenotype: {ko: '표현형', css: 'p-pheno'},
+  indicates: {ko: '검사 판정', css: 'p-test'},
+  subclass_of: {ko: '종류', css: 'p-sub'},
+  involved_in: {ko: '관여', css: 'p-causes'},
+};
+const SRC_LABEL = {skku_lrc_pbl: '성균관의대', claude_draft: 'AI (Claude)', hira_kcd_master: 'KCD 검표·별표', loinc2hpo: 'LOINC2HPO',
+  dismech: 'DisMech', orphadata: 'Orphadata', hpoa: 'HPOA', team_vocab: '팀 사전', derived: '이름 일치',
+  orphanet: 'Orphanet', go: 'GO', orphanet_go: '자동 연결 (Orphanet × GO)', claude_mech: 'AI 기전 (Claude)',
+  statpearls_ai: 'StatPearls (AI 추출 · 원문 인용)', medlineplus_ai: 'MedlinePlus (AI 추출 · 원문 인용)'};
+const TYPE_KO = {G: '유전자 · Orphanet', P: '생물학적 과정 · GO', C: '기전 · AI (Claude)', E: '원인·노출 · 성균관의대', D: '질병', M: '기전 · 성균관의대', X: '기전 · DisMech', F: '소견 · 성균관의대', H: '소견 · HPO', T: '검사', A: '검사'};
+const COL = {G: 2, P: 2, C: 2, E: 0, D: 1, M: 2, X: 2, F: 3, H: 3, T: 4};
+const LOINC = D.loinc || {}, NLAB = D.node_labels || {};
+nm.T = c => (LOINC[c] && (LOINC[c][1] || LOINC[c][0])) || c;
+const ANKO = D.analyte_ko || {};
+nm.A = a => ANKO[a] || a;
+en.A = a => ANKO[a] ? a : '';
+const ANV = new Map();  /* 묶음 → 세부 LOINC 코드 */
+Object.entries(LOINC).forEach(([c, l]) => push(ANV, l[7] || c, c));
+/* LOINC 성질·검체 한국어 */
+const PROP_KO = {MCnc: '질량농도', SCnc: '몰농도', ACnc: '임의단위 농도', PrThr: '유무·역치', AFr: '임의단위 분율', NCnc: '개수 농도', NFr: '개수 분율', Ratio: '비', MRto: '질량비', SRto: '몰비', CCnc: '효소 활성 농도', Titr: '역가', MRat: '시간당 질량(배설량)', SRat: '시간당 몰량(배설량)', NRat: '시간당 개수', VRat: '시간당 부피', VFr: '부피 분율', MFr: '질량 분율', SFr: '몰 분율', CFr: '효소 활성 분율', Naric: '면적당 개수', Prid: '유무·종류', MSCnc: '질량 또는 몰농도', Time: '시간', RelTime: '상대 시간', PPres: '분압', Pres: '압력', SpGrav: '비중', MCnt: '질량 함량', CCnt: '효소 활성 함량', SCnt: '몰 함량', ACnt: '임의단위 함량', LsCnc: '로그 농도', Vol: '부피', Len: '길이', Mass: '질량', Temp: '온도', Type: '종류', Imp: '판독·해석', Morph: '형태', Color: '색', RelRto: '상대비', NRto: '개수 비', EntMeanVol: '평균 부피', EntVol: '부피', EntMass: '질량', EntMCnc: '질량농도', SatFr: '포화도', Prctl: '백분위', Zscore: 'Z점수', MoM: '중앙값 배수(MoM)', PctDiff: '백분율 차이', DistWidth: '분포 폭', SCncDiff: '몰농도 차이', RelMCnc: '상대 질량농도', RelCCnc: '상대 효소 활성', ARat: '시간당 임의단위', ArVRat: '면적당 부피 속도', 'VFr.DF': '부피 분율', 'MFr.DF': '질량 분율'};
+const SYS_KO = {'Serum': '혈청', 'Serum or Plasma': '혈청·혈장', 'Plasma': '혈장', 'Urine': '소변', 'Blood': '혈액', 'Cerebrospinal Fluid': '뇌척수액', 'Urine sediment': '소변 침사', 'Capillary blood': '모세혈관혈', 'Arterial blood': '동맥혈', 'Venous blood': '정맥혈', 'Mixed venous blood': '혼합정맥혈', 'Platelet poor plasma': '혈소판 빈혈장', 'Body fluid': '체액', 'Red Blood Cells': '적혈구', 'Meconium': '태변', 'Cord blood': '제대혈', 'Arterial cord blood': '제대 동맥혈', 'Venous cord blood': '제대 정맥혈', 'Stool': '대변', 'DBS': '건조 혈반(DBS)', 'Urine for Screen method': '소변 (선별검사)', 'Urine for Confirmatory method': '소변 (확인검사)', 'Serum, Plasma or Blood': '혈청·혈장·혈액', 'Hair': '모발', 'Tissue': '조직', 'Semen': '정액', 'Gastric fluid': '위액', 'Bone marrow': '골수', 'Sputum': '객담', 'Sweat': '땀', 'Seminal plasma': '정장', 'Synovial fluid': '관절액', 'Pleural fluid': '흉수', 'Dialysis fluid': '투석액', 'Leukocytes': '백혈구', 'Specimen': '검체', 'Blood from Fetus': '태아 혈액', 'Serum or Plasma ultracentrifugate': '혈청·혈장 초원심분리물', 'Stem cell product': '줄기세포 제제', 'Tissue fine needle aspirate': '조직 세침흡인물', 'Lymph node fine needle aspirate': '림프절 세침흡인물', 'Arterial plasma': '동맥 혈장', 'Plasma venous': '정맥 혈장'};
+const sysKo = s0 => { if (!s0) return ''; const m = /^(\d+) hour (.+)$/.exec(s0); if (m) return `${SYS_KO[m[2]] || m[2]} (${m[1]}시간)`; return SYS_KO[s0] || s0.replace(/ collected for unspecified duration$/, ' (시간 미상 수집)'); };
+en.T = c => (LOINC[c] && LOINC[c][1] ? LOINC[c][0] : '') || '';
+nm.E = sl => NLAB['EXP:' + sl] || sl;
+en.E = () => '';
+
+/* ID 정규화: 원본 ID → 화면 노드 */
+const MONDO2KCD = new Map();
+T.kcd_ext.rows.forEach(r => { const m = val('kcd_ext', r, 'ext_id'), k = val('kcd_ext', r, 'kcd').slice(0, 4); if (!MONDO2KCD.has(m) || val('kcd_ext', r, 'method') === 'icd10_xref') MONDO2KCD.set(m, k); });
+const HP2D = new Map();
+(D.kg || []).forEach(([s, p, o]) => { if (p === 'same_as' && s.startsWith('HP:') && MONDO2KCD.has(o) && !HPO2F.has(s)) HP2D.set(s, ENT.has(MONDO2KCD.get(o) + '@' + o) ? canonD(MONDO2KCD.get(o) + '@' + o) : MONDO2KCD.get(o)); });
+function nid(raw) {
+  if (!raw) return null;
+  if (raw.startsWith('D|')) return 'D|' + canonD(raw.slice(2));  /* 채움 자료는 병명 키를 그대로 쓴다 (합친 병명은 코드로) */
+  const [ns, ...rest] = raw.split(':'), v = rest.join(':');
+  switch (ns) {
+    case 'KCD': return 'D|' + v.replace(/\./g, '').slice(0, 4);  /* 4자리까지 (5·6자리는 한국 확장이라 올린다) */
+    case 'MONDO': return MONDO2KCD.has(raw) ? 'D|' + (ENT.has(MONDO2KCD.get(raw) + '@' + raw) ? canonD(MONDO2KCD.get(raw) + '@' + raw) : MONDO2KCD.get(raw)) : null;
+    case 'HP': return HPO2F.has(raw) ? 'F|' + HPO2F.get(raw) : 'H|' + raw;  /* 질병과 이름이 같은 HPO 용어도 표현형으로 둔다 (동반 보고, 인과 아님) */
+    case 'SKKU': { const [k, ...r] = v.split(':'), w = r.join(':'); return ({F: 'F|', M: 'M|', X: 'E|', P: 'F|'}[k] || 'F|') + w; }  /* 성균관의대 스키마 용어 */
+    case 'FND': return 'F|' + v;
+    case 'MEC': return 'M|' + v;
+    case 'DM': return 'X|' + v;
+    case 'HGNC': case 'GENE': return 'G|' + raw;  /* 기전 채우기 A: 유전자 */
+    case 'GO': return 'P|' + raw;  /* GO 생물학적 과정 */
+    case 'CDM': return 'C|' + v;  /* 기전 채우기 B: Claude 초안 노드 */
+    case 'EXP': return 'E|' + v;
+    case 'LOINC': return 'T|' + v;
+  }
+  return null;
+}
+
+/* 간선 모으기 */
+const GO = new Map(), GI = new Map();
+function addG(s, p, o, attrs) { if (!s || !o || s === o) return; const e = {s, p, o, ...attrs}; push(GO, s, e); push(GI, o, e); }
+const AG = new Map(), TIND = new Map();  /* 검사 묶음 → 판정 소견 (LOINC 코드 여러 개를 모은다) · 코드별 판정 */
+const SKREF = new Map();  /* 노드 → 이 노드가 나온 성균관의대 주호소 스키마들 */
+(D.kg || []).forEach(([s, p, o, src, q, pol, ref, ev]) => {
+  if (p === 'same_as') return;
+  const a = nid(s), b = nid(o);
+  if (p === 'indicates' && a[0] === 'T') {
+    const c = a.slice(2), an = 'A|' + ((LOINC[c] && LOINC[c][7]) || c), k = an + '>' + b + '>' + pol;
+    const g = AG.get(k) || AG.set(k, {s: an, p, o: b, src, pol, qs: new Set(), codes: new Set()}).get(k);
+    if (q) g.qs.add(q); g.codes.add(c); push(TIND, c, {q, pol, o: b}); return;
+  }
+  if (src === 'skku_lrc_pbl' && ref) ref.split(' · ').forEach(z => [a, b].forEach(id => id && (SKREF.get(id) || SKREF.set(id, new Set()).get(id)).add(z)));
+  addG(a, p, b, {src, q, pol, ref, ev});
+});
+AG.forEach(g => addG(g.s, 'indicates', g.o, {src: g.src, pol: g.pol, q: [...g.qs].join('·'), ev: `세부 검사 ${g.codes.size}종: ${[...g.codes].join(', ')}`, codes: [...g.codes]}));
+const CO = new Map();  /* 동반 보고: 표현형 자리에 질병(MONDO)이 적힌 것. 합병증·위험·연관이 섞여 있어 인과로 잇지 않는다 */
+T.entity_phenotype.rows.forEach(r => {  /* 병명 단위 표현형 */
+  const h = kv(r, 'hpo_id'), d = 'D|' + canonD(entKey(r)), a = {src: (kv(r, 'sources') || []).join(','), f: extBest(r), depth: kv(r, 'min_depth'), deny: kv(r, 'deny_only'), row: r,
+    cov: Math.min(1, (kv(r, 'n_ext') || 1) / (((D.stats || {}).entity_members || {})[entKey(r)] || 1))};  /* 병명 아래 묶인 MONDO 하위 질병 중 이 표현형이 있는 비율 */
+  if (!String(h).startsWith('HP:')) { const o = nid(h) || h; push(CO, d, {...a, other: o, term: h}); if (o[0] === 'D') push(CO, o, {...a, other: d, term: h, rev: true}); return; }
+  addG(d, 'has_phenotype', nid(h), a);
+});
+/* DisMech 노드 중 이름이 HPO 표현형인 것: 끝 노드는 그 표현형(소견)으로 바꿔 잇고, 나머지는 같은 이름의 표현형으로 '나타남' */
+const DMP = DMD.pheno || {}, dmTerm = id => DMP[id] && DMP[id][1];
+Object.entries(DMP).forEach(([id, [hp, term]]) => { if (!term) addG('X|' + id, 'manifests_as', nid(hp), {src: 'dismech', q: '같은 이름의 표현형'}); });
+DMm.forEach(m => (DMD.mondo2kcd[m.mondo] || []).forEach(([k0, e0, d]) => {
+  const k = canonD(k0 + '@' + e0);  /* DisMech 기전은 병명에 붙는다 (합친 병명은 코드에) */
+  if (dmTerm(m.id)) { if (m.depth === 1) addG('D|' + k, 'has_phenotype', nid(DMP[m.id][0]), {src: 'dismech', depth: d}); return; }
+  if (m.stage === 'etiology') addG('X|' + m.id, 'constitutes', 'D|' + k, {src: 'dismech', q: '병인', depth: d});
+  else if (m.depth === 1) addG('D|' + k, 'causes', 'X|' + m.id, {src: 'dismech', depth: d});
+}));
+ENT.forEach((v, k) => { if (!SAME.has(k)) addG('D|' + k, 'subclass_of', 'D|' + v.kcd, {src: 'mondo', q: 'KCD 분류'}); });  /* 병명 → 속한 KCD 코드 */
+DMD.edges.forEach(([a, bm, bh]) => { if (bm != null) { if (dmTerm(bm)) addG('X|' + a, 'manifests_as', nid(DMP[bm][0]), {src: 'dismech'}); else addG('X|' + a, 'causes', 'X|' + bm, {src: 'dismech'}); } if (bh) addG('X|' + a, 'manifests_as', nid(bh), {src: 'dismech'}); });
+/* ── 기전 채우기: A 유전자 수준 자동 연결(Orphanet 원인 유전자 → GO 과정), B Claude 기전 초안(+독립 검토). 연결마다 신뢰도 3 높음·2 중간·1 낮음·0 가설 ── */
+const FL = window.DB.fill || null, FN = (FL && FL.nodes) || {};
+const CONF_KO = ['가설', '낮음', '중간', '높음'];
+if (FL) FL.edges.forEach(([s, p, o, src, q, conf, basis, depth, tgt, cd, cr, vd]) =>
+  addG(nid(s), p, nid(o), {src, q, conf, basis: basis || (src === 'orphanet_go' ? q : ''), depth: depth || 0, fill: src === 'claude_mech' ? 'B' : 'A', cd, cr, vd, tgt: tgt && canonD(tgt)}));
+nm.G = v => (FN[v] || [])[3] || v; en.G = v => (FN[v] || [])[2] || '';
+nm.P = v => ((FL && FL.go_ko) || {})[v] || (GOL[v] && GOL[v][1]) || (FN[v] || [])[2] || v; en.P = v => (FN[v] || [])[2] || (GOL[v] && GOL[v][0]) || '';
+nm.C = v => (FN['CDM:' + v] || [])[1] || v; en.C = v => (FN['CDM:' + v] || [])[2] || '';
+const confTxt = e => ` · 신뢰도 ${CONF_KO[e.conf] || '-'}${e.basis ? ' · 근거: ' + e.basis : ''}${e.cd ? ` · 작성 ${e.cd} / 검토 ${e.cr || '없음'}${e.vd ? ' (' + e.vd + ')' : ''}` : ''}`;
+const isMX = id => 'MXGPC'.includes(id[0]);  /* 기전 칸에 놓는 노드: 스키마·DisMech·초안 기전, 유전자·GO 과정 */
+const isEtio = id => id[0] === 'X' && (DMm.get(id.slice(2)) || {}).stage === 'etiology';
+const tko = id => isEtio(id) ? '병인 (DisMech)' : id[0] === 'D' && isEnt(id.slice(2)) ? `병명 · ${dotted(entCode(id.slice(2)))}` : id[0] === 'D' ? `질병 · ${dotted(id.slice(2))}` : TYPE_KO[id[0]];
+
+const edgeOk = e => (!e.fill || ((e.fill === 'A' ? xf.fillA : xf.fillB) && (e.conf > 0 || xf.hyp))) && (xf.sub || !e.depth) && (xf.hpoa || !e.deny) && (!e.src || xf.hpoa || e.src !== 'hpoa');
+const weight = e => e.fill ? 1 + (e.conf || 0) * 1.5 : e.src === 'skku_lrc_pbl' ? 12 : e.f != null ? 2 + e.f * 8 : e.src === 'hira_kcd_master' ? 6 : e.src === 'claude_draft' ? 4 : e.src === 'dismech' ? 3 : e.src === 'loinc2hpo' ? (e.pol === 'present' ? 3 : 1) : 2;
+const nlabel = id => { const k = id[0], v = id.slice(2); return (nm[k] || (z => z))(v); };
+const enOf = id => { const k = id[0], v = id.slice(2); return (en[k] || (() => ''))(v); };
+
+/* ── 그래프 ──
+   화면마다 방향이 하나인 트리를 여러 개 그린다. 닿는 것은 상한 없이 모두 넣고, 화면에 보이는 부분부터 칠한다.
+   정방향(결과 쪽): 뿌리 → 기전 사슬 → 소견. 소견은 끝점, 다른 질병은 잎(그 질병의 그래프는 따로 그린다).
+   역방향(원인 쪽): 뿌리 ← 기전 사슬 ← 질병 ← 원인·노출(잎, 질병과 다른 칸). 어느 그래프든 시간은 왼쪽 → 오른쪽 */
+const CAUSAL = new Set(['causes', 'manifests_as', 'constitutes', 'has_phenotype', 'involved_in']);
+function reachTree(root, dir) {
+  const nodes = new Set([root]), edges = new Set(), st = [root];
+  while (st.length) {
+    const a = st.pop();
+    if (a !== root && (dir > 0 ? 'FHTD'.includes(a[0]) : 'DE'.includes(a[0]))) continue;
+    ((dir > 0 ? GO : GI).get(a) || []).forEach(e => {
+      if (!CAUSAL.has(e.p) || !edgeOk(e) || e.pol === 'absent' || (e.tgt && root[0] === 'D' && e.tgt !== root.slice(2))) return;  /* '보통 없음' 소견은 그래프에 잇지 않는다. GO 과정은 여러 병이 함께 써서, 질병 화면에서는 그 병명을 채운 연결만 따른다 */
+      const b = dir > 0 ? e.o : e.s;
+      if (b === root) return;
+      edges.add(e);
+      if (!nodes.has(b)) { nodes.add(b); st.push(b); }
+    });
+  }
+  return {root, dir, nodes: [...nodes], edges: [...edges]};
+}
+/* 층: 뿌리에서 기전 사슬만 거쳐 가장 긴 경로. 정방향 소견은 맨 오른쪽, 역방향 잎(질병·노출)은 맨 왼쪽에 모은다 */
+function treeLayers(g) {
+  const pred = new Map();
+  g.edges.forEach(e => { const a = g.dir > 0 ? e.s : e.o, b = g.dir > 0 ? e.o : e.s; push(pred, b, a); });
+  const memo = new Map([[g.root, 0]]);
+  const d = (n, seen) => {
+    if (memo.has(n)) return memo.get(n);
+    if (seen.has(n)) return 1;
+    seen.add(n);
+    const ps = (pred.get(n) || []).filter(p => p === g.root || isMX(p));
+    const v = ps.length ? 1 + Math.max(...ps.map(p => d(p, seen))) : 1;
+    seen.delete(n); memo.set(n, v); return v;
+  };
+  g.nodes.forEach(n => d(n, new Set()));
+  const L = new Map([[g.root, 0]]);
+  let maxC = 0;
+  const hasD = g.nodes.some(n => n !== g.root && !isMX(n) && n[0] !== 'E');  /* 역방향: 질병이 있으면 원인·노출은 그 왼쪽 칸으로 따로 */
+  g.nodes.forEach(n => { if (n !== g.root && (isMX(n) || (g.dir > 0 && n[0] === 'D'))) maxC = Math.max(maxC, memo.get(n)); });
+  g.nodes.forEach(n => {
+    if (n === g.root) return;
+    if (g.dir > 0) L.set(n, 'FH'.includes(n[0]) ? maxC + 1 : n[0] === 'T' ? maxC + 2 : memo.get(n));
+    else L.set(n, isMX(n) ? -memo.get(n) : n[0] === 'E' && hasD ? -(maxC + 2) : -(maxC + 1));
+  });
+  g.L = L; g.maxC = maxC;
+  return g;
+}
+/* 검사 그래프: 소견(왼쪽) ← 검사(오른쪽). 뿌리가 여럿이다 */
+function testGraph(fs) {
+  const nodes = new Set(), edges = [];
+  fs.forEach(f => (GI.get(f) || []).forEach(e => { if (e.p === 'indicates' && edgeOk(e)) { nodes.add(f); nodes.add(e.s); edges.push(e); } }));
+  const L = new Map([...nodes].map(n => [n, 'TA'.includes(n[0]) ? 1 : 0]));  /* 검사(묶음)는 오른쪽 칸 */
+  return {root: null, dir: 1, nodes: [...nodes], edges, L, maxC: 0, kind: 'tests'};
+}
+/* 검사 → 판정 소견 */
+function testDownGraph(t) {
+  const edges = (GO.get(t) || []).filter(e => e.p === 'indicates' && edgeOk(e));
+  const nodes = [t, ...new Set(edges.map(e => e.o))];
+  return {root: t, dir: 1, nodes, edges, L: new Map(nodes.map(n => [n, n === t ? 0 : 1])), maxC: 0, kind: 'test'};
+}
+function colName(g, Lv) {
+  const at = g.nodes.filter(n => g.L.get(n) === Lv), hasD = at.some(n => n[0] === 'D'), onlyD = at.length && at.every(n => n[0] === 'D');
+  if (g.kind === 'tests') return Lv === 0 ? '소견' : '판정 검사';
+  if (g.kind === 'test') return Lv === 0 ? '검사' : '판정하는 소견';
+  if (g.kind === 'consult') return Lv === 0 ? '후보 질병' : Lv === g.maxC + 1 ? '입력한 소견 (있음)' : `기전 ${Lv}단계`;
+  const r = g.root[0];
+  if (Lv === 0) return {D: '질병', F: '소견', H: '소견', M: '기전', X: isEtio(g.root) ? '병인' : '기전', E: '원인·노출', G: '유전자', P: '생물학적 과정', C: '기전 (AI)'}[r] || '';
+  if (at.length && at.every(n => n[0] === 'P')) return '관여 과정 (GO)';
+  if (at.length && at.every(n => n[0] === 'G')) return '원인 유전자 (Orphanet)';
+  if (g.dir > 0) {
+    if (Lv === g.maxC + 1) return '소견';
+    const base = r === 'D' ? `기전 ${Lv}차` : `결과 기전 ${Lv}단계`;
+    return onlyD ? '파생 질병' : base + (hasD ? ' · 파생 질병' : '');
+  }
+  if (Lv <= -(g.maxC + 1)) return at.length && at.every(n => n[0] === 'E') ? '원인·노출' : 'FH'.includes(r) ? '질병 (감별 후보)' : '원인 질병';
+  if (r === 'D' && Lv === -1) return '병인 · 질병을 이루는 기전';
+  return `원인 기전 ${-Lv}단계`;
+}
+const NW = 168, NH = 48, RH = 58, GTOP = 34, GGAP = 46, GX0 = 14;
+const rankOf = id => Math.max(0, ...((GO.get(id) || []).concat(GI.get(id) || [])).filter(edgeOk).map(weight));
+function layoutGraph(g) {
+  const all = g.nodes, L = g.L, root = g.root;
+  const nbr = new Map();
+  g.edges.forEach(e => { push(nbr, e.s, [e.o, e]); push(nbr, e.o, [e.s, e]); });
+  // 트리 부모: 뿌리 쪽으로 한 걸음 가까운 이웃 중 층이 가장 가깝고 연결이 강한 것
+  const parent = new Map(), pedge = new Map();
+  all.forEach(id => {
+    if (id === root) return;
+    const Lv = L.get(id), ok = q => Lv > 0 ? L.get(q) < Lv && L.get(q) >= 0 : Lv < 0 ? L.get(q) > Lv && L.get(q) <= 0 : q === root;
+    const best = (nbr.get(id) || []).filter(([q]) => ok(q)).map(([q, e]) => ({q, e, d: Math.abs(L.get(q) - Lv), w: weight(e)})).sort((a, b) => a.d - b.d || b.w - a.w)[0];
+    if (best) { parent.set(id, best.q); pedge.set(id, best.e); }
+  });
+  parent.forEach((p, id) => { let q = p, n = 0; while (q && n++ < 80) { if (q === id) { parent.delete(id); break; } q = parent.get(q); } });
+  const kids = new Map(); parent.forEach((p, id) => push(kids, p, id));
+  const rk = new Map(all.map(id => [id, g.rank && g.rank.has(id) ? g.rank.get(id) : pedge.has(id) ? weight(pedge.get(id)) : rankOf(id)]));
+  const ld = (a, p) => Math.abs(L.get(a) - L.get(p)) || 99;  /* 같은 칸 자식은 맨 뒤 */
+  kids.forEach((arr, p) => arr.sort((a, b) => ld(a, p) - ld(b, p) || rk.get(b) - rk.get(a) || nlabel(a).localeCompare(nlabel(b))));
+  const y = new Map(); let row = 0;
+  const lay = id => { const ch = kids.get(id) || []; if (!ch.length || L.get(ch[0]) === L.get(id)) { y.set(id, row++); ch.forEach(lay); return; } ch.forEach(lay); y.set(id, y.get(ch[0])); };
+  const roots = all.filter(id => !parent.has(id)).sort((a, b) => (b === root) - (a === root) || L.get(a) - L.get(b) || rk.get(b) - rk.get(a));
+  roots.forEach(r => { if (!y.has(r)) { lay(r); row += 0.4; } });
+  const Ls = [...L.values()], lo = Math.min(...Ls), hi = Math.max(...Ls);
+  const cols = Array.from({length: hi - lo + 1}, (_, i) => lo + i);  /* 빈 칸도 남겨 단계가 칸 위치와 맞게 */
+  const xOf = Lv => GX0 + (Lv - lo) * (NW + GGAP);
+  const pos = new Map(all.map(id => [id, [xOf(L.get(id)), GTOP + y.get(id) * RH]]));
+  const W = GX0 * 2 + cols.length * NW + (cols.length - 1) * GGAP, H = GTOP + Math.max(1, row) * RH + 10;
+  const sideL = Lv => g.kind ? false : g.dir > 0 ? Lv >= 2 && Lv <= g.maxC : Lv <= -2 && Lv > -(g.maxC + 1);
+  const heads = `<rect class="hband" x="0" y="0" width="${W}" height="27"/><line class="hline" x1="0" x2="${W}" y1="27.5" y2="27.5"/>` + cols.map(Lv => `<text class="colh${sideL(Lv) ? ' side' : ''}" x="${xOf(Lv)}" y="18">${esc(colName(g, Lv))}<tspan class="cn" dx="6">${all.filter(id => L.get(id) === Lv).length}</tspan></text>`).join('');
+  const route = (x1, y1, x2, y2, busAtStart, off = 0) => {
+    const dy = y2 - y1, sg = dy > 0 ? 1 : -1, dir = x2 > x1 ? 1 : -1;
+    if (Math.abs(dy) < 1) return `M${x1},${y1} H${x2}`;
+    const gx = (busAtStart ? x1 + dir * GGAP / 2 : x2 - dir * GGAP / 2) + off, rr = Math.min(7, Math.abs(dy) / 2);
+    return `M${x1},${y1} H${gx - dir * rr} Q${gx},${y1} ${gx},${y1 + sg * rr} V${y2 - sg * rr} Q${gx},${y2} ${gx + dir * rr},${y2} H${x2}`;
+  };
+  const tree = new Set([...parent].map(([c, p]) => p + '>' + c));
+  /* 같은 노드에서 나간(또는 같은 노드로 모이는) 선은 칸 사이 통로의 세로선 하나를 함께 쓴다 (한 줄로 합쳐 그림) */
+  const edges = g.edges.map((e, ei) => {
+    const [sx, sy0] = pos.get(e.s), [tx, ty0] = pos.get(e.o), sy = sy0 + NH / 2, ty = ty0 + NH / 2;
+    let d;
+    if (sx === tx) { const ax = sx + NW, b = 18 + Math.min(30, Math.abs(ty - sy) / 6); d = `M${ax},${sy} C${ax + b},${sy} ${ax + b},${ty} ${ax + 2},${ty}`; }
+    else {
+      const atS = Math.abs(L.get(e.s)) <= Math.abs(L.get(e.o));
+      d = sx < tx ? route(sx + NW, sy, tx - 2, ty, atS) : route(sx, sy, tx + NW + 2, ty, atS);
+    }
+    const P = PRED[e.p] || PRED.causes, isTree = tree.has(e.s + '>' + e.o) || tree.has(e.o + '>' + e.s);
+    const cls = `xe ${P.css}${isTree ? '' : ' xtra'}${e.src === 'skku_lrc_pbl' ? ' s-skku' : ''}${e.depth ? ' sub' : ''}${e.deny ? ' deny' : ''}${e.pol === 'absent' ? ' absent' : ''}${(e.q || '').includes('기전 미상') ? ' shortcut' : ''}${e.fill ? ' fill-' + e.fill + ' conf-' + e.conf : ''}`;
+    const w = e.fill ? 0.8 + (e.conf || 0) * 0.35 : e.src === 'skku_lrc_pbl' ? 1.8 : e.f != null ? 0.7 + e.f * 1.3 : 1.1;
+    /* 보이는 선은 가늘어 마우스를 대기 어려워, 같은 모양의 투명한 굵은 선(xh)을 위에 깔아 출처 툴팁을 띄운다 */
+    return {y0: Math.min(sy, ty), y1: Math.max(sy, ty), s: e.s, o: e.o, e, html: `<path class="${cls}" data-ei="${ei}" data-a="${e.s}" data-b="${e.o}" stroke-width="${w.toFixed(1)}" marker-end="url(#ah-${P.css})" d="${d}"/>`, hit: `<path class="xh" data-ei="${ei}" d="${d}"/>`};
+  });
+  const nodes = all.map(id => {
+    const [px, py] = pos.get(id), k = id[0], full = nlabel(id), e2 = enOf(id), side = sideL(L.get(id));
+    return {y0: py, y1: py + NH, html: `<g class="xn ${k}${id === root || id === g.focus ? ' focus' : ''}${side ? ' side' : ''}" data-id="${esc(id)}" transform="translate(${px},${py})" tabindex="0" role="button" aria-label="${esc(full)}"><rect class="bg" width="${NW}" height="${NH}" rx="6"/><rect class="card" width="${NW}" height="${NH}" rx="6"/><text class="t1" x="9" y="16">${esc(short(full, 13))}</text><text class="t2" x="${NW / 2}" y="${NH / 2 + 7}" text-anchor="middle">${esc(short(full, 7))}</text><text class="enl" x="9" y="29">${esc(short(e2 || '', 27))}</text><text class="sub" x="9" y="42">${esc(short(g.sub && g.sub.has(id) ? g.sub.get(id) : nodeSub(id, pedge.get(id), root), 26))}</text><title>${esc(full)}${e2 ? ' · ' + esc(e2) : ''}</title></g>`};
+  });
+  const fx = root || g.focus;
+  return {W, H, heads, edges, nodes, cx: cols.map(xOf), rootId: fx && pos.has(fx) ? fx : '', rootX: fx && pos.has(fx) ? pos.get(fx)[0] : 0, rootY: fx && pos.has(fx) ? pos.get(fx)[1] : 0, n: all.length, m: g.edges.length};
+}
+function nodeSub(id, e, root) {
+  if (id[0] === 'C') { const n = FN['CDM:' + id.slice(2)] || []; return `AI · 신뢰도 ${CONF_KO[n[6]] || '-'}${n[5] ? ' · = ' + nlabel(nid(n[5])) : ''}`; }
+  if (id[0] === 'A') return `검사 · 세부 ${(ANV.get(id.slice(2)) || []).length}종${e && e.q ? ' · ' + e.q : ''}`;
+  if (id === root) return tko(id);
+  if (id[0] === 'H' && HP2D.has(id.slice(2))) return `표현형 · = 질병 ${nm.D(HP2D.get(id.slice(2)))}`;
+  if (!e) return tko(id);
+  const src = (e.src || '').split(',').map(s => SRC_LABEL[s] || s).join('·');
+  const extra = e.fill ? ` · ${CONF_KO[e.conf] || '-'}` : e.f != null ? ` · ${FREQ_KO(e.f)}` : e.q && e.p === 'indicates' ? ` · ${e.q}` : '';
+  return `${tko(id)} · ${src}${extra}${e.depth ? ' · 하위' : ''}`;
+}
+/* 그래프를 HTML로: 높이 TILE px 조각(SVG)으로 나눠 넣고, 화면 근처 조각만 칠한다.
+   세로 수만 px짜리 SVG 하나는 브라우저가 스크롤마다 무겁게 다시 그려서 조각으로 나눈다 */
+const GV = [], CGV = [], TILE = 1500;
+let ERDG = null;  /* 구조 탭 ERD 도 그래프 창과 같은 확대·이동을 쓴다 (data-gi="e0") */
+const getG = gi => { const g = String(gi); return g[0] === 'c' ? CGV[+g.slice(1)] : g[0] === 'e' ? ERDG : GV[+gi]; };  /* c로 시작하면 진료 탭 그래프 */
+const MARKERS = () => `<defs>${Object.values(PRED).map(p => `<marker id="ah-${p.css}" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="mk ${p.css}" d="M1 1.5L9 5L1 8.5z"/></marker>`).join('')}</defs>`;
+function graphSec(title, desc, g, emptyMsg, collapsed, sink) {
+  const info = desc ? `<button type="button" class="ginfo" data-desc="${esc(desc)}" aria-label="이 그래프 설명">${ic('help')}</button>` : '';
+  if (!g || g.nodes.length < 2) return collapsed ? `<details class="gsec acc"><summary><h3>${title} <span class="gcnt">· 없음</span></h3></summary><div class="empty" style="text-align:left;padding:10px 0">${emptyMsg || '자료에 이어진 노드가 없습니다.'}</div></details>` : `<div class="gsec"><div class="ghead"><h3>${title}</h3>${info}</div><div class="empty gempty">${emptyMsg || '자료에 이어진 노드가 없습니다.'}</div></div>`;
+  const lay = layoutGraph(g), gi = sink === 'c' ? 'c' + CGV.length : GV.length, nt = Math.ceil(lay.H / TILE);
+  (sink === 'c' ? CGV : GV).push({lay});
+  const tiles = tilesHtml(gi, lay);
+  const head = `<h3>${title} <span class="gcnt">노드 ${fmt(lay.n)} · 연결 ${fmt(lay.m)}</span></h3>`, body = `${gzBar()}<div class="xwrap" data-gi="${gi}" tabindex="0" aria-label="연결 구조 그래프: 끌어서 이동, Ctrl+휠로 확대·축소, 우클릭으로 노드 고정"><div class="gpad"><div class="gtiles" style="width:${lay.W}px">${tiles}</div></div></div>`;
+  return collapsed ? `<details class="gsec acc"><summary>${head}${info}</summary>${body}</details>` : `<div class="gsec"><div class="ghead">${head}${info}</div>${body}</div>`;
+}
+let paintQ = false;
+function paintGraphs(force) {
+  /* 읽기(위치) → 쓰기(칠하기)를 나눠, 조각 하나 칠할 때마다 문서 전체 배치를 다시 하지 않게 한다 */
+  const vh = innerHeight, tiles = [...document.querySelectorAll('#xdetail svg.xg[data-gi], #consult svg.xg[data-gi], #gmodal svg.xg[data-gi]')];
+  /* 화면 근처 조각만 칠하고, 아주 멀어진 조각(위아래 4화면 밖)만 비운다 — 빨리 스크롤해도 지웠다 다시 그리기를 되풀이하지 않게 */
+  const plan = tiles.map(svg => { const r = svg.getBoundingClientRect(); return [svg, r.height > 0 && r.bottom > -vh && r.top < 2 * vh, r.height === 0 || r.bottom < -4 * vh || r.top > 5 * vh]; });  /* 접힌 칸(높이 0)은 칠하지 않는다 */
+  const touched = new Set();
+  plan.forEach(([svg, near, far]) => {
+    const g = getG(svg.dataset.gi); if (!g) return;
+    if (near && (force || svg.dataset.p !== '1')) {
+      const w = svg.closest('.xwrap'); if (w) touched.add(w);
+      const t = +svg.dataset.t, lo = t * TILE, hi = lo + TILE;
+      const es = g.lay.edges.filter(it => it.y1 >= lo - 2 && it.y0 <= hi + 2);
+      svg.querySelector('g.edges').innerHTML = es.map(it => it.html).join('');
+      svg.querySelector('g.hits').innerHTML = es.map(it => it.hit).join('');
+      svg.querySelector('g.nodes').innerHTML = g.lay.nodes.filter(it => it.y1 >= lo && it.y0 <= hi).map(it => it.html).join('');
+      svg.dataset.p = '1';
+    } else if (far && svg.dataset.p === '1') {
+      svg.querySelector('g.edges').innerHTML = ''; svg.querySelector('g.hits').innerHTML = ''; svg.querySelector('g.nodes').innerHTML = ''; svg.dataset.p = '';
+    }
+  });
+  touched.forEach(w => { if (w.dataset.pin || w.dataset.hov) hlApply(w); });  /* 새로 칠한 조각에도 고정·강조를 입힌다 */
+}
+document.addEventListener('scroll', () => { if (!paintQ) { paintQ = true; requestAnimationFrame(() => { paintQ = false; paintGraphs(); }); } }, {capture: true, passive: true});
+window.addEventListener('resize', () => { document.querySelectorAll('.xwrap[data-gi]:not(.gm-wrap)').forEach(w => { w.style.height = boxCap() + 'px'; }); paintGraphs(true); });
+/* 그래프 창 높이: 처음 그릴 때 한 번 정하고 확대·축소·스크롤로 바뀌지 않게 한다. 처음부터 작은 그래프는 그 크기에 맞춤 */
+const boxCap = () => Math.round(innerWidth < 720 ? innerHeight * 0.6 : Math.max(320, innerHeight - (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--tabs-h')) || 52) - 150));
+function boxSize(w) { w.style.height = boxCap() + 'px'; }  /* 모든 그래프 창은 같은 높이 (화면 높이에 맞춘 최대) */
+/* 여백: 평소에는 없다 (그래프 끝에서 멈춤). 노드를 눌러 넘어갈 때만 그 노드를 누른 자리에 놓을 만큼 빈 자리를 두고,
+   그 빈 자리는 그래프 쪽으로 움직이면 줄어들어 사라진다 (다시 빈 곳으로 끝없이 갈 수 없게) */
+function setPad(w, l = 0, t = 0, r = 0, b = 0) {
+  const pad = w.querySelector(':scope > .gpad'); if (!pad) return;
+  w._pl = l; w._pt = t; w._pr = r; w._pb = b; pad.style.padding = `${t}px ${r}px ${b}px ${l}px`;
+}
+function shrinkPad(w) {
+  const l = w._pl || 0, t = w._pt || 0, r = w._pr || 0, b = w._pb || 0; if (!(l || t || r || b)) return;
+  const g = getG(w.dataset.gi), sc = w._s || 1, cw = g.lay.W * sc, ch = g.lay.H * sc;
+  const nl = Math.min(l, Math.max(0, l - w.scrollLeft)), nt = Math.min(t, Math.max(0, t - w.scrollTop));
+  const nr = Math.min(r, Math.max(0, w.scrollLeft + w.clientWidth - (l + cw))), nb = Math.min(b, Math.max(0, w.scrollTop + w.clientHeight - (t + ch)));
+  if (nl === l && nt === t && nr === r && nb === b) return;
+  const sl = w.scrollLeft - (l - nl), st = w.scrollTop - (t - nt);
+  setPad(w, nl, nt, nr, nb); w.scrollLeft = sl; w.scrollTop = st;
+}
+/* 뿌리 노드가 보이게: 왼쪽·위쪽 끝은 그래프 시작에 맞춘다 (빈 여백이 보이지 않게) */
+function centerRoot(w) {
+  const g = getG(w.dataset.gi), sc = w._s || 1; if (!g) return;
+  setPad(w);
+  w.scrollLeft = Math.max(0, (g.lay.rootX + NW / 2) * sc - w.clientWidth / 2);
+  w.scrollTop = Math.max(0, (g.lay.rootY + NH / 2) * sc - w.clientHeight / 2);
+}
+/* ── 그래프 확대·축소와 이동 ──
+   Ctrl(⌘)+휠·트랙패드 핀치·두 손가락으로 커서 자리를 중심으로 확대, 마우스로 끌어 이동, 버튼(− + 폭 맞춤 전체 100%)과 키(+ − 0).
+   배율은 그래프마다 따로 두고, 새 그래프는 마지막으로 고른 배율로 연다 */
+let GZPREF = 1; try { GZPREF = +localStorage.getItem('gzpref') || 1; } catch (e) {}
+const GZD = {on: false, moved: false};
+const gzBar = full => `<div class="gzbar" role="toolbar" aria-label="그래프 확대·축소"><button type="button" data-gz="out" title="축소 (−)" aria-label="축소">${ic('zoom_out')}</button><output>100%</output><button type="button" data-gz="in" title="확대 (+)" aria-label="확대">${ic('zoom_in')}</button><button type="button" data-gz="fitw" title="폭 맞춤 (0)">${ic('width_full', '폭 맞춤')}</button>${full ? `<button type="button" data-gz="fit" title="창에 전체가 보이게">${ic('fit_screen', '전체 맞춤')}</button>` : ''}<button type="button" data-gz="one" title="원래 크기">100%</button>${full ? '' : `<button type="button" data-gz="full" title="크게 열어 전체 보기">${ic('open_in_full', '전체 보기')}</button>`}<span class="gzpin" hidden></span><button type="button" class="ghelp" aria-label="그래프 다루는 법">${ic('help')}</button></div>`;
+const gzClamp = v => Math.min(2.5, Math.max(0.08, v));
+const barOf = w => { if (w.classList.contains('gm-wrap')) return w.closest('.gm-panel').querySelector('.gzbar'); const b = w.previousElementSibling; return b && b.classList.contains('gzbar') ? b : null; };
+const wrapOf = bar => { const p = bar.closest('.gm-panel'); if (p) return p.querySelector('.gm-wrap'); const w = bar.nextElementSibling; return w && w.classList.contains('xwrap') ? w : null; };
+function gzSize(w, s) {
+  const g = getG(w.dataset.gi), t = w.querySelector('.gtiles'); if (!g || !t) return;
+  w._s = s; t.style.width = Math.round(g.lay.W * s) + 'px';
+  w.classList.toggle('lod-mid', s < 0.6 && s >= 0.3); w.classList.toggle('lod-far', s < 0.3);
+  t.querySelectorAll('svg.xg, svg.erdsvg').forEach(svg => { const vb = svg.viewBox.baseVal; svg.style.width = vb.width * s + 'px'; svg.style.height = vb.height * s + 'px'; });
+  const b = barOf(w); if (b) b.querySelector('output').value = Math.round(s * 100) + '%';
+}
+function gzApply(w, s, ax, ay) {
+  const t = w.querySelector('.gtiles'); if (!t) return;
+  const old = w._s || 1, wr = w.getBoundingClientRect(), tr = t.getBoundingClientRect();
+  s = gzClamp(s);
+  if (ax == null) ax = wr.left + w.clientWidth / 2;
+  if (ay == null) ay = wr.top + w.clientHeight / 2;
+  const cx = (ax - tr.left) / old, cy = (ay - tr.top) / old;
+  gzSize(w, s);
+  const tr2 = t.getBoundingClientRect();
+  w.scrollLeft += tr2.left + cx * s - ax;
+  w.scrollTop += tr2.top + cy * s - ay;
+  paintGraphs();
+}
+const gzPref = s => { GZPREF = s; try { localStorage.setItem('gzpref', String(s)); } catch (e) {} };
+function gzInit(w) { if (GZPREF !== 1) gzSize(w, GZPREF); else w._s = 1; }
+function gzFit(w, both) {
+  const g = getG(w.dataset.gi); if (!g) return;
+  let s = (w.clientWidth - 4) / g.lay.W;
+  if (both) s = Math.min(s, (w.clientHeight - 4) / g.lay.H);
+  gzSize(w, gzClamp(Math.min(s, 1.5))); setPad(w); w.scrollLeft = 0; w.scrollTop = 0;
+  paintGraphs(true);
+}
+/* 강조: 마우스를 올리면 그 노드와 바로 이웃만 살짝 (나머지는 조금 옅게), 우클릭으로 고정하면 그 노드를 지나는 경로 전체(위로 원인 쪽 끝까지 · 아래로 결과 쪽 끝까지)를 밝게 */
+function gAdj(g) {
+  if (g.adj) return g.adj;
+  const F = new Map(), B = new Map();
+  g.lay.edges.forEach((it, i) => { push(F, it.s, i); push(B, it.o, i); });
+  return (g.adj = {F, B});
+}
+function nbrSet(g, id) {
+  const {F, B} = gAdj(g), E = g.lay.edges, ns = new Set([id]), es = new Set();
+  (F.get(id) || []).forEach(i => { es.add(i); ns.add(E[i].o); });
+  (B.get(id) || []).forEach(i => { es.add(i); ns.add(E[i].s); });
+  return {ns, es};
+}
+function chainSet(g, id) {
+  const {F, B} = gAdj(g), E = g.lay.edges, ns = new Set([id]), es = new Set();
+  const walk = (M, next) => { const st = [id], seen = new Set([id]); while (st.length) { const a = st.pop(); (M.get(a) || []).forEach(i => { es.add(i); const b = next(E[i]); if (!seen.has(b)) { seen.add(b); ns.add(b); st.push(b); } }); } };
+  walk(F, it => it.o); walk(B, it => it.s);
+  return {ns, es};
+}
+function hlApply(w) {
+  const g = getG(w.dataset.gi), pin = w.dataset.pin, hov = w.dataset.hov, id = pin || hov;
+  w.classList.toggle('pin', !!pin); w.classList.toggle('hov', !pin && !!hov);
+  if (!id || !g) { w._hl = null; w.querySelectorAll('.lit, .pinned, .hot').forEach(z => z.classList.remove('lit', 'pinned', 'hot')); return; }
+  const k = (pin ? 'p' : 'h') + id;
+  if (!w._hl || w._hl.k !== k) w._hl = {k, ...chainSet(g, id)};  /* 올리기·선택 모두 이어진 경로 전체 (선택이 더 진하게) */
+  const {ns, es} = w._hl;
+  w.querySelectorAll('.xn').forEach(z => { const i = z.dataset.id, on = ns.has(i); if (z.classList.contains('lit') !== on) z.classList.toggle('lit', on); z.classList.toggle('pinned', !!pin && i === pin); z.classList.toggle('hot', !pin && i === hov); });
+  w.querySelectorAll('path.xe').forEach(q => { const on = es.has(+q.dataset.ei); if (q.classList.contains('lit') !== on) q.classList.toggle('lit', on); });
+}
+/* 아주 멀리 볼 때(30% 미만, 색 상자만 보일 때) 노드에 마우스를 올리면, 노드 위에 이름만 고정된 크기로 띄운다 */
+let NTIP = null;
+function nodeTip(w, id) {
+  const n = id && [...w.querySelectorAll('.xn')].find(z => z.dataset.id === id);
+  if (!n || (w._s || 1) >= 0.3) { if (NTIP) NTIP.hidden = true; return; }  /* 색 상자만 보일 만큼 멀 때만 */
+  if (!NTIP) { NTIP = document.createElement('div'); NTIP.setAttribute('role', 'tooltip'); document.body.appendChild(NTIP); }
+  const sub = (n.querySelector('text.sub') || {}).textContent || '', e2 = enOf(id);
+  NTIP.innerHTML = `<b>${esc(nlabel(id))}</b>`;  /* 이름만 */
+  NTIP.className = 'ntip k-' + id[0]; NTIP.hidden = false;
+  const r = n.getBoundingClientRect(), tw = NTIP.offsetWidth, th = NTIP.offsetHeight;
+  NTIP.style.left = Math.max(8, Math.min(r.left + r.width / 2 - tw / 2, innerWidth - tw - 8)) + 'px';
+  NTIP.style.top = (r.top - th - 8 > 60 ? r.top - th - 8 : r.bottom + 8) + 'px';
+}
+document.addEventListener('scroll', () => { if (NTIP) NTIP.hidden = true; }, {capture: true, passive: true});
+document.addEventListener('wheel', e => { if (NTIP && (e.ctrlKey || e.metaKey)) NTIP.hidden = true; }, {passive: true});
+/* 선 위에 잠깐 멈추면 출처를 작게 */
+let ETIP = null, ETT = null, EPOS = [0, 0];
+function edgeTipHtml(it) {
+  const e = it.e, P = PRED[e.p] || PRED.causes;
+  const src = (e.src || '').split(',').filter(Boolean).map(z => SRC_LABEL[z] || z).join(', ') || '출처 미상';
+  const extra = [e.fill ? '신뢰도 ' + (CONF_KO[e.conf] || '-') : '', e.f != null ? FREQ_KO(e.f) : '', e.q || '', e.depth ? '하위 질병에서' : '', e.pol === 'absent' ? '없음 판정' : ''].filter(Boolean).join(' · ');
+  const cite = /_ai$/.test(e.src || '') && e.ev ? `<span>${esc(short(e.ref || '', 60))} · 검수 전</span><span>“${esc(short(String(e.ev).split(' | ')[0], 160))}”</span>` : '';  /* 원문 근거 AI 추출: 문서 제목 + 인용 */
+  return `<b>출처 · ${esc(src)}</b><span>${esc(short(nlabel(it.s), 16))} → ${esc(short(nlabel(it.o), 16))} · ${esc(P.ko)}${extra ? ' · ' + esc(extra) : ''}</span>${cite}`;
+}
+function hideEtip() { clearTimeout(ETT); if (ETIP) ETIP.hidden = true; document.querySelectorAll('path.xe.ehot').forEach(q => q.classList.remove('ehot')); }
+document.addEventListener('mouseover', ev => {
+  const h = ev.target.closest && ev.target.closest('path.xh'); if (!h) return;
+  const svg = h.closest('svg.xg'), g = getG(svg.dataset.gi), it = g && g.lay.edges[+h.dataset.ei]; if (!it) return;
+  hideEtip();
+  const vis = svg.querySelector(`path.xe[data-ei="${h.dataset.ei}"]`); if (vis) vis.classList.add('ehot');
+  ETT = setTimeout(() => {
+    if (!ETIP) { ETIP = document.createElement('div'); ETIP.className = 'etip'; ETIP.setAttribute('role', 'tooltip'); document.body.appendChild(ETIP); }
+    ETIP.innerHTML = edgeTipHtml(it); ETIP.hidden = false;
+    ETIP.style.left = Math.min(EPOS[0] + 12, innerWidth - ETIP.offsetWidth - 8) + 'px'; ETIP.style.top = Math.min(EPOS[1] + 14, innerHeight - ETIP.offsetHeight - 8) + 'px';
+  }, 380);
+});
+document.addEventListener('mousemove', ev => { EPOS = [ev.clientX, ev.clientY]; }, {passive: true});
+document.addEventListener('mouseout', ev => { if (ev.target.closest && ev.target.closest('path.xh')) hideEtip(); });
+document.addEventListener('scroll', hideEtip, {capture: true, passive: true});
+function gzPin(w, id) {
+  w.dataset.pin = id || ''; w.dataset.hov = '';
+  hlApply(w);
+  const b = barOf(w), c = b && b.querySelector('.gzpin');
+  if (c) { c.hidden = !id; c.innerHTML = id ? `${ic('push_pin')}선택: ${esc(short(nlabel(id), 18))} <button type="button" data-gz="unpin" aria-label="선택 해제" title="선택 해제 (Esc · 빈 곳 누르기)">${ic('close')}</button>` : ''; }
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('.gzbar button[data-gz]'); if (!b) return;
+  const bar = b.closest('.gzbar'), w = wrapOf(bar); if (!w) return;
+  const z = b.dataset.gz;
+  if (z === 'in') { gzApply(w, (w._s || 1) * 1.25); gzPref(w._s); }
+  else if (z === 'out') { gzApply(w, (w._s || 1) / 1.25); gzPref(w._s); }
+  else if (z === 'one') { gzApply(w, 1); gzPref(1); }
+  else if (z === 'fitw') gzFit(w, false);
+  else if (z === 'fit') gzFit(w, true);
+  else if (z === 'unpin') gzPin(w, '');
+  else if (z === 'full') openFull(w);
+});
+document.addEventListener('wheel', e => {
+  const w = e.target.closest && e.target.closest('.xwrap[data-gi]');
+  if (!w) return;
+  if (!(e.ctrlKey || e.metaKey) && w.classList.contains('gm-wrap')) return;  /* 팝업 창 안의 그냥 휠은 그래프를 움직인다 */
+  if (!(e.ctrlKey || e.metaKey)) {  /* 그냥 휠은 페이지 스크롤, 좌우 휠·Shift+휠은 그래프 창 좌우 */
+    const k = e.deltaMode === 1 ? 40 : e.deltaMode === 2 ? innerHeight : 1;
+    if (e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY)) { e.preventDefault(); w.scrollLeft += (e.shiftKey && !e.deltaX ? e.deltaY : e.deltaX) * k; return; }
+    e.preventDefault(); window.scrollBy(0, e.deltaY * k); return;
+  }
+  e.preventDefault();
+  gzWheelZoom(w, Math.exp(-e.deltaY * (e.deltaMode ? 0.05 : 0.0022)), e.clientX, e.clientY);
+}, {passive: false});
+/* 휠 확대는 한 화면 그리기(프레임)에 한 번만: 휠 신호가 몰려도 배율을 모아 한 번에 바꾼다 */
+let ZQ = null;
+function gzWheelZoom(w, f, ax, ay) {
+  if (ZQ && ZQ.w !== w) ZQ = null;
+  if (!ZQ) { ZQ = {w, f: 1}; requestAnimationFrame(() => { const q = ZQ; ZQ = null; if (!q) return; gzApply(q.w, (q.w._s || 1) * q.f, q.ax, q.ay); gzPref(q.w._s); }); }
+  ZQ.f *= f; ZQ.ax = ax; ZQ.ay = ay;
+}
+let GZG = null;  /* Safari 트랙패드 핀치 */
+document.addEventListener('gesturestart', e => { const w = e.target.closest && e.target.closest('.xwrap[data-gi]'); if (w) { e.preventDefault(); GZG = {w, s: w._s || 1}; } }, {passive: false});
+document.addEventListener('gesturechange', e => { if (!GZG) return; e.preventDefault(); gzApply(GZG.w, GZG.s * e.scale, e.clientX, e.clientY); }, {passive: false});
+document.addEventListener('gestureend', () => { if (GZG) gzPref(GZG.w._s); GZG = null; });
+let GZT = null;  /* 터치: 두 손가락 벌리기·오므리기 (한 손가락은 원래대로 스크롤) */
+const tDist = ts => Math.hypot(ts[0].clientX - ts[1].clientX, ts[0].clientY - ts[1].clientY) || 1;
+document.addEventListener('touchstart', e => { const w = e.target.closest && e.target.closest('.xwrap[data-gi]'); if (w && e.touches.length === 2) GZT = {w, d: tDist(e.touches), s: w._s || 1}; }, {passive: true});
+document.addEventListener('touchmove', e => { if (!GZT || e.touches.length !== 2) return; e.preventDefault(); const [a, b] = e.touches; gzApply(GZT.w, GZT.s * tDist(e.touches) / GZT.d, (a.clientX + b.clientX) / 2, (a.clientY + b.clientY) / 2); }, {passive: false});
+document.addEventListener('touchend', e => { if (GZT && e.touches.length < 2) { gzPref(GZT.w._s); GZT = null; } });
+/* 마우스로 끌어 이동: 좌우는 그래프 창, 위아래는 페이지 */
+document.addEventListener('pointerdown', e => {
+  if (e.pointerType !== 'mouse' || e.button !== 0) return;
+  const w = e.target.closest && e.target.closest('.xwrap[data-gi]'); if (!w) return;
+  Object.assign(GZD, {on: true, w, x: e.clientX, y: e.clientY, dist: 0, moved: false});
+});
+document.addEventListener('pointermove', e => {
+  if (!GZD.on) return;
+  const dx = e.clientX - GZD.x, dy = e.clientY - GZD.y; GZD.x = e.clientX; GZD.y = e.clientY; GZD.dist += Math.abs(dx) + Math.abs(dy);
+  if (GZD.dist > 5) { if (!GZD.moved) { GZD.moved = true; GZD.w.classList.add('gzdrag'); } GZD.w.scrollLeft -= dx; GZD.w.scrollTop -= dy;  /* 끌기는 그래프 창 안에서만 움직이고 페이지는 그대로 */ }
+});
+const gzUp = () => { if (!GZD.on) return; GZD.on = false; GZD.w.classList.remove('gzdrag'); setTimeout(() => { GZD.moved = false; }, 0); };
+document.addEventListener('pointerup', gzUp); document.addEventListener('pointercancel', gzUp);
+/* 키: 그래프 창 안에서 + − 0, 어디서나 Ctrl(⌘)+Z 뒤로 · Ctrl(⌘)+Shift+Z 앞으로 · Alt+←/→ · Esc 고정 해제 */
+document.addEventListener('keydown', e => {
+  const t = e.target;
+  if (t.closest && t.closest('input, textarea, select, [contenteditable="true"]')) return;
+  const w = t.closest && t.closest('.xwrap[data-gi]'), mod = e.ctrlKey || e.metaKey, k = (e.key || '').toLowerCase();
+  if (w && !mod && !e.altKey) {
+    if (e.key === '+' || e.key === '=') { e.preventDefault(); gzApply(w, (w._s || 1) * 1.25); gzPref(w._s); return; }
+    if (e.key === '-' || e.key === '_') { e.preventDefault(); gzApply(w, (w._s || 1) / 1.25); gzPref(w._s); return; }
+    if (e.key === '0') { e.preventDefault(); gzFit(w, false); return; }
+  }
+  if (e.key === 'Escape') { document.querySelectorAll('.xwrap[data-pin]').forEach(z => { if (z.dataset.pin) gzPin(z, ''); }); return; }
+  const ex = document.getElementById('sec-explore'); if (ex && ex.hidden) return;
+  if ((mod && k === 'z' && !e.shiftKey) || (e.altKey && e.key === 'ArrowLeft')) { if (x.hist.length) { e.preventDefault(); goBack(); } }
+  else if ((mod && ((k === 'z' && e.shiftKey) || k === 'y')) || (e.altKey && e.key === 'ArrowRight')) { if (x.fwd.length) { e.preventDefault(); goFwd(); } }
+});
+/* ── 뒤로·앞으로: 화면 위치, 펼친 칸, 그래프마다 좌우 위치·배율·고정까지 되돌린다 ── */
+function viewSnap() {
+  return {y: scrollY, open: [...document.querySelectorAll('#xdetail details.acc')].map(d => d.open),
+    g: [...document.querySelectorAll('#xdetail .xwrap[data-gi]')].map(w => [w.scrollLeft, w._s || 1, w.dataset.pin || '', w.scrollTop, [w._pl || 0, w._pt || 0, w._pr || 0, w._pb || 0]])};
+}
+function viewRestore(v) {
+  if (!v) return;
+  document.querySelectorAll('#xdetail details.acc').forEach((d, j) => { if (v.open[j] != null && d.open !== v.open[j]) { if (v.open[j]) d.dataset.restore = '1'; d.open = v.open[j]; } });
+  document.querySelectorAll('#xdetail .xwrap[data-gi]').forEach((w, j) => { const z = v.g[j]; if (!z) return; gzSize(w, z[1]); setPad(w, ...(z[4] || [])); w.scrollLeft = z[0]; w.scrollTop = z[3] || 0; if (z[2]) gzPin(w, z[2]); });
+  scrollTo(0, v.y); paintGraphs(true);
+  requestAnimationFrame(() => { scrollTo(0, v.y); document.querySelectorAll('#xdetail .xwrap[data-gi]').forEach((w, j) => { const z = v.g[j]; if (z) { w.scrollLeft = z[0]; w.scrollTop = z[3] || 0; } }); paintGraphs(true); });
+}
+const curEntry = () => [x.cur, x.cur === 'D' && x.etab ? x.etab : x.id, viewSnap(), x.path.slice()];
+function goBack() {
+  if (!x.hist.length) return;
+  const [k, i, v, pth] = x.hist.pop(); x.fwd.push(curEntry());
+  x.path = pth || []; x.cur = null; x.nav = true; focusOn(k, i); x.nav = false; viewRestore(v);
+}
+/* 경로의 i번째 깊이로 올라간다 (경로는 거기까지 잘리고, 이 이동도 '뒤로'에 남는다) */
+function goCrumb(i) {
+  const e = x.path[i]; if (!e) return;
+  focusOn(e[0], e[1]); viewRestore(e[2]);
+}
+document.addEventListener('click', e => {
+  const m = e.target.closest('#cbMore');
+  if (m) { pop(m, `<h4>중간 경로</h4>${m.dataset.mid.split(',').map(i => `<button type="button" class="cbi" data-ci="${i}">${esc(nlabel(x.path[+i][0] + '|' + x.path[+i][1]))}</button>`).join('')}`); return; }
+  const c = e.target.closest('[data-ci]'); if (c) { closePop(); goCrumb(+c.dataset.ci); }
+});
+function goFwd() {
+  if (!x.fwd.length) return;
+  const [k, i, v, pth] = x.fwd.pop(); x.hist.push(curEntry());
+  x.path = pth || []; x.cur = null; x.nav = true; focusOn(k, i); x.nav = false; viewRestore(v);
+}
+/* ── 기전 연결 유무: DisMech(X)·성균관의대 스키마(M) 기전과 이어진 질병인가 ── */
+let MECHD = null;
+function mechSet() {
+  if (MECHD) return MECHD;
+  MECHD = new Set();
+  GO.forEach((es, id) => { if (id[0] === 'D' && es.some(e => 'MX'.includes(e.o[0]))) MECHD.add(id.slice(2)); });
+  GI.forEach((es, id) => { if (id[0] === 'D' && es.some(e => 'MX'.includes(e.s[0]))) MECHD.add(id.slice(2)); });
+  return MECHD;
+}
+const hasMech = k => mechSet().has(k) || (ENTS.get(k) || []).some(e => mechSet().has(e));
+let MKM = null;
+const MK_RANK = {mech: 3, draft: 2, gene: 1};
+function mechKindMap() {  /* 질병 키 → 'mech'(스키마·DisMech) · 'draft'(B) · 'gene'(A) 중 가장 강한 것 */
+  if (MKM) return MKM;
+  MKM = new Map();
+  const set = (k, v) => { if (!MKM.has(k) || MK_RANK[v] > MK_RANK[MKM.get(k)]) MKM.set(k, v); };
+  const look = (id, other, e) => { if (id[0] !== 'D') return; const t = other[0]; if ('MX'.includes(t) && !e.fill) set(id.slice(2), 'mech'); else if (t === 'C') set(id.slice(2), 'draft'); else if ('GP'.includes(t)) set(id.slice(2), 'gene'); };
+  GO.forEach((es, id) => es.forEach(e => look(id, e.o, e)));
+  GI.forEach((es, id) => es.forEach(e => look(id, e.s, e)));
+  return MKM;
+}
+const mechKind = k => { const m = mechKindMap(); let best = m.get(k) || ''; (ENTS.get(k) || []).forEach(e => { const v = m.get(e); if (v && (!best || MK_RANK[v] > MK_RANK[best])) best = v; }); return best; };
+function noMechNote(mk) {
+  if (mk === 'draft') return `<div class="nomechbox"><b>기전: AI.</b> DisMech·성균관의대 스키마에는 이 질병의 기전이 없어, 교과서·의학 지식으로 AI(Claude)가 쓴 기전으로 채웠습니다. 작성자와 독립 검토자가 연결마다 매긴 신뢰도 중 낮은 쪽을 씁니다 (교과서 정설 = 높음 · 일반적 합의 = 중간 · 일부 근거 = 낮음 · 추정 = 가설, 가설은 기본 숨김). 의학과 검수 전입니다. 선이나 노드에 마우스를 올리면 근거가 보입니다.</div>`;
+  if (mk === 'gene') return `<div class="nomechbox"><b>기전: 유전자 수준만.</b> 임상 기전 사슬은 아직 없고, Orphanet의 원인 유전자와 그 유전자가 관여하는 GO 생물학적 과정을 자동으로 이었습니다 (아래 '이 질병을 일으키는 것'). 분자 수준이라 소견까지 이어지지는 않습니다. 신뢰도는 연관 종류(원인 변이 > 감수성 > 후보)와 GO 근거(실험 > 계통·유사)로 매깁니다.</div>`;
+  const M = mechSet(), withP = [...KP.keys()], withPM = withP.filter(k => M.has(k)).length;
+  return `<div class="nomechbox"><b>기전 연결 없음.</b> 이 질병은 DisMech·성균관의대 스키마 어디에도 기전이 이어져 있지 않아, 아래 그래프는 질병 → 소견(표현형)만 보여 줍니다. 기전이 없다는 뜻이 아니라 <b>자료에 아직 없다</b>는 뜻입니다. <span class="muted">KCD에 이어진 병명 중 표현형이 있는 ${fmt(withP.length)}개 가운데 기전이 이어진 것은 ${fmt(withPM)}개 (${Math.round(100 * withPM / Math.max(1, withP.length))}%). 목록에서는 '기전 없음'으로 표시합니다.</span></div>`;
+}
+function bindGraphs(scope = '#xdetail') {
+  document.querySelectorAll(scope + ' details.acc').forEach(dt => dt.addEventListener('toggle', () => { if (!dt.open) return; if (dt.dataset.restore) { delete dt.dataset.restore; paintGraphs(true); return; } dt.querySelectorAll('.xwrap[data-gi]').forEach(w => centerRoot(w)); paintGraphs(true); }));
+  document.querySelectorAll(scope + ' .xwrap[data-gi]').forEach(wrap => bindWrap(wrap));
+  paintGraphs(true);
+}
+/* 그래프 창 하나에 강조·고정·누르기를 붙인다 (본문 창과 '전체 보기' 팝업 창이 같이 쓴다) */
+function bindWrap(wrap) {
+  const g = getG(wrap.dataset.gi), modal = wrap.classList.contains('gm-wrap'), fromConsult = String(wrap.dataset.gi)[0] === 'c';
+  if (!modal) {
+    gzInit(wrap); boxSize(wrap); centerRoot(wrap);
+    wrap.addEventListener('scroll', () => shrinkPad(wrap), {passive: true});
+  }
+  /* 마우스를 올리면 잠깐 강조, 우클릭(또는 노드에서 스페이스)이면 고정. 고정 중에는 스크롤·화살표로 움직여도 강조가 남는다 */
+  const hov = id => {  /* 노드 사이를 지나갈 때 깜빡이지 않게 아주 잠깐 기다렸다 바꾼다 */
+    clearTimeout(wrap._ht);
+    wrap._ht = setTimeout(() => { nodeTip(wrap, id); }, id ? 35 : 110);
+    /* 마우스 올림 강조는 일단 끈다 (10/07 사용자 요청). 되살리려면 위 줄 대신 아래 줄
+    wrap._ht = setTimeout(() => { nodeTip(wrap, id); if (wrap.dataset.pin || (wrap.dataset.hov || '') === (id || '')) return; wrap.dataset.hov = id || ''; hlApply(wrap); }, id ? 35 : 110);
+    */
+  };
+  wrap.addEventListener('mouseover', ev => { if (GZD.on) return; const n = ev.target.closest('.xn'); if (n) hov(n.dataset.id); else if (wrap.dataset.hov) hov(''); });
+  wrap.addEventListener('mouseleave', () => hov(''));
+  wrap.addEventListener('focusin', ev => { const n = ev.target.closest('.xn'); if (n) hov(n.dataset.id); });
+  wrap.addEventListener('contextmenu', ev => { const n = ev.target.closest('.xn'); if (!n && !wrap.dataset.pin) return; ev.preventDefault(); gzPin(wrap, n && n.dataset.id !== wrap.dataset.pin ? n.dataset.id : ''); });
+  /* 누르기: 한 번 = 이어진 경로를 강조해 선택, 같은 노드를 한 번 더(또는 두 번 누르기) = 그 노드 화면으로. 빈 곳을 누르면 선택 해제 */
+  const go = ev => {
+    if (ev.type === 'click' && GZD.moved) { GZD.moved = false; return; }  /* 끌어서 이동한 뒤의 클릭은 무시 */
+    const n = ev.target.closest('.xn');
+    if (n && ev.type === 'keydown' && ev.key === ' ') { ev.preventDefault(); gzPin(wrap, n.dataset.id !== wrap.dataset.pin ? n.dataset.id : ''); return; }
+    if (ev.type === 'click' && !n) { if (wrap.dataset.pin && !ev.target.closest('.xh')) gzPin(wrap, ''); return; }
+    if (!n || (ev.type === 'keydown' && ev.key !== 'Enter')) return;
+    /* 선택 중에 함께 강조된(이어진) 노드를 누르면 바로 그 노드 화면으로, 강조 밖 노드는 새로 선택 */
+    if (ev.type === 'click' && wrap.dataset.pin !== n.dataset.id && ev.detail < 2 && !(wrap.dataset.pin && n.classList.contains('lit'))) { gzPin(wrap, n.dataset.id); return; }
+    const id = n.dataset.id;
+    if (!modal && !fromConsult) x.clicked = true;  /* 노드를 눌러 왔으면 새 화면에서 그 노드에 초점 */  /* 누른 노드의 화면 자리 → 새 화면에서 그 노드를 같은 자리에 */
+    if (modal) closeFull();
+    if (fromConsult) showTab('explore');
+    if (id !== x.cur + '|' + x.id) focusOn(id[0], id.slice(2), fromConsult);  /* 진료 탭에서 온 것은 새 길 */
+  };
+  wrap.addEventListener('click', go); wrap.addEventListener('keydown', go);
+}
+/* '전체 보기': 그래프를 큰 팝업 창에 열고 전체가 보이게 맞춘다. 안에서도 끌기·확대·우클릭 고정·노드 누르기가 된다 */
+const tilesHtml = (gi, lay) => Array.from({length: Math.ceil(lay.H / TILE)}, (_, t) => { const top = t * TILE, h = Math.min(TILE, lay.H - top);
+  return `<svg class="xg" data-gi="${gi}" data-t="${t}" viewBox="0 ${top} ${lay.W} ${h}" width="${lay.W}" height="${h}">${t === 0 ? MARKERS() + lay.heads : ''}<g class="edges"></g><g class="hits"></g><g class="nodes"></g></svg>`; }).join('');
+function openFull(w) {
+  closeFull();
+  const gi = w.dataset.gi, g = getG(gi); if (!g) return;
+  const erd = String(gi)[0] === 'e', sec = w.closest('.gsec');
+  const title = erd ? '지식 DB 구조 (ERD)' : sec && sec.querySelector('h3') ? sec.querySelector('h3').firstChild.textContent.trim() + ' · ' + nlabel(x.cur === 'D' && x.etab ? 'D|' + x.etab : x.cur + '|' + x.id) : '그래프';
+  const inner = erd ? `<div class="gtiles" style="width:${g.lay.W}px">${w.querySelector('svg.erdsvg').outerHTML}</div>` : `<div class="gtiles" style="width:${g.lay.W}px">${tilesHtml(gi, g.lay)}</div>`;
+  const m = document.createElement('div'); m.className = 'gmodal'; m.id = 'gmodal';
+  m.innerHTML = `<div class="gm-scrim"></div><div class="gm-panel" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="gm-head"><b title="${esc(title)}">${esc(title)}</b>${gzBar(true)}<button type="button" class="tbtn icon" id="gmClose" title="닫기 (Esc)" aria-label="닫기">${ic('close')}</button></div><div class="xwrap gm-wrap" data-gi="${gi}" tabindex="0"${erd ? ' data-erd="1"' : ''}>${inner}</div></div>`;
+  document.body.appendChild(m); document.body.classList.add('gm-on');
+  const mw = m.querySelector('.gm-wrap');
+  if (!erd) { bindWrap(mw); if (w.dataset.pin) gzPin(mw, w.dataset.pin); }
+  else mw.addEventListener('click', e => { if (GZD.moved) { GZD.moved = false; return; } const ent = e.target.closest('.ent'); if (ent) { closeFull(); openTable(ent.dataset.table); showTab('tables'); } });
+  mw._s = 1;
+  { const sw = (mw.clientWidth - 4) / g.lay.W, sb = Math.min(sw, (mw.clientHeight - 4) / g.lay.H);  /* 한 화면에 다 들어가도 읽을 만하면 전체 맞춤, 아니면 폭 맞춤 (전체 맞춤 단추로 한눈에) */
+    gzFit(mw, sb >= 0.4); }
+  m.querySelector('.gm-scrim').onclick = closeFull; m.querySelector('#gmClose').onclick = closeFull;
+  mw.focus({preventScroll: true});
+}
+function closeFull() { const m = $('#gmodal'); if (m) { m.remove(); document.body.classList.remove('gm-on'); } }
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !POP && $('#gmodal')) { closeFull(); e.stopImmediatePropagation(); } }, true);
+/* 감별 후보: 소견의 원인 쪽 그래프에서 잎(질병·노출)을 근거가 강한 순으로 */
+function ddxRows(g) {
+  const toRoot = new Map();  /* 잎 → 뿌리 쪽 이웃(기전 또는 소견)과 간선 */
+  g.edges.forEach(e => { if ('DE'.includes(e.s[0])) push(toRoot, e.s, e); });
+  return [...toRoot].map(([id, es]) => {
+    const best = es.slice().sort((p, q) => weight(q) - weight(p))[0];
+    const via = [...new Set(es.map(e => e.o === g.root ? '직접 (표현형)' : nlabel(e.o)))];
+    const n = new Set(es.flatMap(e => e.ref ? e.ref.split(' · ') : [])).size, f = Math.max(-1, ...es.map(e => e.f != null ? e.f : -1));
+    return {id, score: weight(best) + 0.5 * (es.length - 1), via, n, f, src: [...new Set(es.flatMap(e => (e.src || '').split(',')).filter(Boolean))]};
+  }).sort((a, b) => b.score - a.score || nlabel(a.id).localeCompare(nlabel(b.id)));
+}
+function ddxTable(g) {
+  const all = ddxRows(g);
+  const sec = (rows, title, col) => {
+    if (!rows.length) return '';
+    const html = rows.map((r, i) => `<tr><td class="mono">${i + 1}</td><td><button class="fk" data-focus="${esc(r.id)}">${bi(nlabel(r.id), enOf(r.id))}</button><span class="muted" style="font-size:11px"> ${tko(r.id)}</span></td><td>${esc(r.via.join(' · '))}</td><td>${esc([r.n ? `스키마 ${r.n}` : '', r.f >= 0 ? FREQ_KO(r.f) : '', r.src.map(s => SRC_LABEL[s] || s).join(', ')].filter(Boolean).join(' · '))}</td></tr>`);
+    return `<div class="dsec"><h3>${title} ${fmt(rows.length)}개 <span class="muted" style="font-weight:400;font-size:12.5px">· 근거가 강한 순 (스키마 · 빈도 · 경로 수)</span></h3><div class="tablewrap"><table><thead><tr><th>#</th><th>${col}</th><th>거치는 기전</th><th>근거</th></tr></thead>${lazyBody(html)}</table></div></div>`;
+  };
+  return sec(all.filter(r => r.id[0] !== 'E'), '감별 후보 (질병)', '질병') + sec(all.filter(r => r.id[0] === 'E'), '원인·노출', '원인·노출');
+}
+/* 긴 표는 스크롤에 맞춰 이어 붙인다 */
+const LZ = [];
+function lazyBody(rows, page = 100) {
+  const i = LZ.length; LZ.push({rows, shown: Math.min(page, rows.length), page});
+  return `<tbody data-lz="${i}">${rows.slice(0, page).join('')}</tbody>${rows.length > page ? `<tfoot><tr><td colspan="9"><div class="lzsent" data-lz="${i}" style="height:1px"></div></td></tr></tfoot>` : ''}`;
+}
+const lzObs = 'IntersectionObserver' in window ? new IntersectionObserver(ents => ents.forEach(en => {
+  if (!en.isIntersecting) return;
+  const st = LZ[+en.target.dataset.lz], tb = document.querySelector(`tbody[data-lz="${en.target.dataset.lz}"]`);
+  if (!st || !tb) return;
+  tb.insertAdjacentHTML('beforeend', st.rows.slice(st.shown, st.shown + st.page).join(''));
+  st.shown += st.page;
+  lzObs.unobserve(en.target);
+  if (st.shown < st.rows.length) lzObs.observe(en.target); else en.target.remove();
+}), {rootMargin: '400px'}) : null;
+/* 검사 묶음의 세부 검사: 성질(질량농도·몰농도…)·검체·방법·부하 조건과 판정 */
+function variantTable(a) {
+  const vs = (ANV.get(a) || []).slice().sort((p, q) => (LOINC[p][3] || '').localeCompare(LOINC[q][3] || '') || (LOINC[p][4] || '').localeCompare(LOINC[q][4] || '') || p.localeCompare(q));
+  const rows = vs.map(c => { const l = LOINC[c], ind = TIND.get(c) || [];
+    return `<tr${x.hlLoinc === c ? ' class="hl"' : ''}><td class="mono"><a class="fk" href="https://loinc.org/${esc(c)}" target="_blank" rel="noopener">${esc(c)}</a></td><td>${bi(l[1] || l[0], l[1] ? l[0] : '')}</td><td>${esc(PROP_KO[l[3]] || l[3] || '')}<span class="muted" style="font-size:11px"> ${esc(l[3] || '')}</span></td><td>${esc(sysKo(l[4]))}</td><td>${esc([l[5], l[6]].filter(Boolean).join(' · '))}</td><td>${ind.map(z => `<span class="arr">${esc(z.q || '')}${z.pol === 'absent' ? ' (없음)' : ''} → <button class="fk" data-focus="${esc(z.o)}">${esc(nlabel(z.o))}</button></span>`).join(' ')}</td></tr>`; });
+  return `<div class="dsec"><h3>세부 검사 ${vs.length}종 <span class="muted" style="font-weight:400;font-size:12.5px">· 같은 분석물을 성질(질량농도·몰농도·비)과 검체·조건에 따라 나눈 LOINC 코드</span></h3><div class="tablewrap"><table><thead><tr><th>LOINC</th><th>검사 이름</th><th>성질</th><th>검체</th><th>방법·조건</th><th>결과 → 판정 소견</th></tr></thead>${lazyBody(rows)}</table></div></div>`;
+}
+/* 화면 구성: 초점 종류마다 질문 하나에 그래프 하나 */
+/* 분류 코드 화면: 그 칸의 병명들이 함께 가진 DisMech 기전(같은 GO 용어)과, 병명마다의 기전 그래프 */
+function entMechs(k) {
+  const e = ENT.get(k), out = [];
+  if (e) DMm.forEach(m => (DMD.mondo2kcd[m.mondo] || []).forEach(([c, em]) => { if (c === e.kcd && em === e.mondo) out.push(m); }));
+  return out;
+}
+function catMechHtml(code) {
+  const ents = ENTS.get(code) || [], byGO = new Map();
+  ents.forEach(k => entMechs(k).forEach(m => m.go.forEach((g, i) => {
+    const mm = byGO.get(g) || byGO.set(g, new Map()).get(g);
+    (mm.get(k) || mm.set(k, []).get(k)).push(`${nm.X(m.id)}${MOD_KO[m.gm[i]] ? ' ' + MOD_KO[m.gm[i]] : ''}`);
+  })));
+  const withMech = ents.filter(k => entMechs(k).length), shared = [...byGO].filter(([, mm]) => mm.size >= 2).sort((a, b) => b[1].size - a[1].size || goName(a[0]).localeCompare(goName(b[0])));
+  let h = '';
+  if (ents.length >= 2) {
+    const head = `<tr><th>공통 기전 (GO)</th>${withMech.map(k => `<th><button class="fk" data-focus="D|${esc(k)}">${esc(nm.D(k))}</button></th>`).join('')}</tr>`;
+    const body = shared.map(([g, mm]) => `<tr><td>${bi(goName(g), goEn(g))}<span class="mono muted" style="font-size:11px"> ${esc(g)}</span></td>${withMech.map(k => `<td>${(mm.get(k) || []).map(z => esc(z)).join('<br>') || '<span class="muted">–</span>'}</td>`).join('')}</tr>`).join('');
+    const note = withMech.length < 2 ? `DisMech 기전이 있는 병명이 ${withMech.length}개뿐이라 공통 기전을 셀 수 없습니다.` : shared.length ? `이 분류 칸에 든 병명 ${ents.length}개 중 DisMech 기전이 있는 ${withMech.length}개가 함께 가리키는 GO 생물학적 과정입니다. 칸 안의 병들이 무엇을 공유하는지(위쪽 기전)를 보여 주고, 아래 병명별 그래프에서 어디서 갈리는지 봅니다. ↑↓는 그 과정이 늘었는지 줄었는지.` : '이 칸의 병명들이 함께 가리키는 GO 과정이 없습니다. 같은 칸에 묶였지만 기전은 서로 다릅니다.';
+    h += `<div class="dsec"><h3>이 분류에 든 병명 ${ents.length}개의 공통 기전 <span class="muted" style="font-weight:400;font-size:12.5px">· 병명마다의 기전은 위 탭에서</span></h3><p class="muted" style="font-size:12.5px;margin:0 0 8px">${note}</p>${shared.length ? `<div class="tablewrap"><table><thead>${head}</thead><tbody>${body}</tbody></table></div>` : ''}</div>`;
+  }
+  return h;
+}
+function graphsHtml(kind, key) {
+  GV.length = 0; LZ.length = 0;
+  let h = '';
+  const leavesF = g => g.nodes.filter(n => 'FH'.includes(n[0]) && n !== g.root);
+  if (kind === 'D') {
+    const fw = treeLayers(reachTree(key, 1)), bw = treeLayers(reachTree(key, -1));
+    h += graphSec('이 질병의 기전', '질병에서 기전 사슬을 거쳐 소견까지. 소견은 끝점이고, 기전이 이루는 다른 질병은 잎으로 둡니다 (누르면 그 질병 화면).', fw);
+    h += graphSec('이 질병을 일으키는 것', '병인(질병을 이루는 결함·기전), 그 앞의 원인 기전, 원인이 되는 질병과 노출. 유전자 자동 연결(A)은 원인 유전자 → 관여 과정(GO) → 질병입니다.', bw, '', mechKind(key.slice(2)) !== 'gene');  /* 기본은 접어 둔다 */
+    if (!isEnt(key.slice(2)) && (ENTS.get(key.slice(2)) || []).length >= 2) h += catMechHtml(key.slice(2));  /* 공통 탭: 병명들의 공통 기전 (그래프 창 자리가 바뀌지 않게 그래프 아래에) */
+    if (isEnt(key.slice(2)) && soleEnt(entCode(key.slice(2)))) {  /* 병명이 하나뿐인 코드: 코드에 남은 성균관의대 연결도 함께 */
+      const pc = 'D|' + entCode(key.slice(2)), pg = treeLayers(reachTree(pc, 1));
+      if (pg.nodes.length > 1) h += graphSec(`속한 KCD 코드 ${dotted(pc.slice(2))}의 연결`, '스키마 항목이 이 병명이 아니라 코드 이름으로 적힌 연결입니다. 이 코드의 병명은 하나뿐이라 진료 탭은 이 연결을 물려받아 씁니다.', pg, '', true);
+    }
+    const tg = testGraph(leavesF(fw));
+    if (tg.nodes.length) h += graphSec('소견을 판정하는 검사', '위 그래프의 소견을 확인하는 검사 결과 (LOINC2HPO).', tg);
+  } else if ('FH'.includes(kind)) {
+    const bw = treeLayers(reachTree(key, -1));
+    h += graphSec('이 소견이 될 수 있는 것 (원인)', '소견을 일으키는 기전을 거슬러 올라가 질병, 그 앞의 원인·노출까지. 질병 칸이 감별 후보입니다.', bw);
+    h += ddxTable(bw);
+    const tg = testGraph([key]);
+    if (tg.nodes.length) h += graphSec('이 소견을 판정하는 검사', '', tg);
+  } else if ('MXGPC'.includes(kind)) {
+    const bw = treeLayers(reachTree(key, -1)), fw = treeLayers(reachTree(key, 1));  /* 원인일 때를 먼저: 뿌리가 왼쪽 위에서 시작 (질병 화면과 같은 규칙) */
+    h += graphSec('이 기전이 원인일 때: 무엇을 일으키고 이루나', '이 기전에서 이어지는 기전·소견, 그리고 이 기전이 이루는 질병. 그 질병에게 이 기전은 병인입니다.', fw);
+    h += graphSec('이 기전이 결과일 때: 무엇이 일으키나', '이 기전을 일으키는 기전·질병·노출. 여기 나온 질병에게 이 기전은 그 병의 기전입니다.', bw);
+    const tg = testGraph(leavesF(fw));
+    if (tg.nodes.length) h += graphSec('소견을 판정하는 검사', '', tg);
+  } else if (kind === 'A') {
+    const g = testDownGraph(key);
+    h += graphSec('이 검사가 판정하는 소견', '세부 검사들의 결과값(H·L·N·POS·NEG)에 따라 판정되는 소견. N·NEG는 그 이상이 없다는 판정입니다.', g);
+    h += variantTable(key.slice(2));  /* 세부 검사 표는 그래프 아래 (그래프 창 자리를 고정) */
+    g.edges.filter(e => e.pol === 'present').forEach(e => {
+      const bw = treeLayers(reachTree(e.o, -1));
+      h += graphSec(`결과 ${esc(e.q || '')} → ${esc(nlabel(e.o))}일 때 가능한 원인`, '', bw);
+      h += ddxTable(bw);
+    });
+  }
+  return h;
+}
+
+const LEGEND = `<div class="blegend"><span><i class="l-causes"></i>일으킴 (원인 → 결과)</span><span><i class="l-const"></i>이룸 (기전 → 질병)</span><span><i class="l-short"></i>지름길 질병 → 질병 (KCD †→*, 기전 미상)</span><span><i class="l-manifest"></i>나타남 (기전 → 소견)</span><span><i class="l-pheno"></i>표현형 (질병 → 소견, 점선 = 하위 질병에서)</span><span><i class="l-test"></i>검사 판정 (검사 → 소견, 점선 = '없음' 판정)</span><span>굵은 선 = 성균관의대 스키마 · 화살표 방향이 인과, 추론은 거꾸로</span><span><i class="l-fill"></i>기전 채우기 (파란 선: AI 기전 B · 유전자 자동 연결 A)</span><span><i class="l-conf1"></i>신뢰도 낮음</span><span><i class="l-conf0"></i>가설 (기본 숨김)</span></div>`;
+
+/* 이 노드의 들어오는·나가는 간선 표 */
+const ET = {};  /* 연결 표 이어 불러오기 상태: 방향별 목록·행 함수·보인 수 */
+const ET_PAGE = 100;
+function edgeRow(e, dir) {
+  const other = dir > 0 ? e.o : e.s, P = PRED[e.p] || {ko: e.p};
+  const det = [e.fill ? confTxt(e).slice(3) : '', e.ref ? e.ref : '', e.f != null ? FREQ_KO(e.f) : '', e.q ? (e.p === 'indicates' ? `결과 ${e.q}` : e.q) : '', e.pol === 'absent' ? '없음 판정' : '', e.depth ? '하위 질병에서' : '', e.deny ? 'HPOA만' : ''].filter(Boolean).join(' · ');
+  return `<tr><td><span class="ev ${(PRED[e.p] || {}).css || ''}">${P.ko}</span></td><td><button class="fk" data-focus="${esc(other)}">${bi(nlabel(other), enOf(other))}</button><span class="muted" style="font-size:11px"> ${TYPE_KO[other[0]]}</span></td><td>${esc((e.src || '').split(',').map(s => SRC_LABEL[s] || s).join(', '))}</td><td>${esc(det)}${e.ev ? `<div class="path">${esc(short(e.ev, 120))}</div>` : ''}</td></tr>`;
+}
+function edgeTable(id, dir) {
+  const list = ((dir > 0 ? GO : GI).get(id) || []).filter(edgeOk).sort((p, q) => (p.p > q.p) - (p.p < q.p) || weight(q) - weight(p));
+  if (!list.length) return '';
+  ET[dir] = {list, shown: Math.min(ET_PAGE, list.length)};
+  return `<div class="dsec"><h3>${dir > 0 ? '나가는 연결 (이 노드가 원인)' : '들어오는 연결 (이 노드가 결과)'} ${fmt(list.length)}개</h3><div class="tablewrap"><table><thead><tr><th>관계</th><th>${dir > 0 ? '도착' : '출발'}</th><th>출처</th><th>근거</th></tr></thead><tbody id="et${dir > 0 ? 'o' : 'i'}">${list.slice(0, ET_PAGE).map(e => edgeRow(e, dir)).join('')}</tbody></table></div>${list.length > ET_PAGE ? `<div class="etsent" data-dir="${dir}" style="height:1px"></div>` : ''}</div>`;
+}
+/* 표 끝 표시가 화면에 들어오면 다음 묶음을 붙인다 */
+const etObs = 'IntersectionObserver' in window ? new IntersectionObserver(ents => ents.forEach(en => {
+  if (!en.isIntersecting) return;
+  const dir = +en.target.dataset.dir, st = ET[dir], tb = $(dir > 0 ? '#eto' : '#eti');
+  if (!st || !tb) return;
+  tb.insertAdjacentHTML('beforeend', st.list.slice(st.shown, st.shown + ET_PAGE).map(e => edgeRow(e, dir)).join(''));
+  st.shown += ET_PAGE;
+  if (st.shown >= st.list.length) { etObs.unobserve(en.target); en.target.remove(); }
+  else { etObs.unobserve(en.target); etObs.observe(en.target); }
+}), {rootMargin: '400px'}) : null;
+
+/* 상세 머리말: 높이가 늘 같다 (종류·코드 · 이름 · 영어 이름 · 꼬리표 · 병명 줄). 그래서 노드를 따라가도 그래프 창이 같은 자리에서 시작한다.
+   길거나 가끔만 보는 정보(상위·하위 코드, 이름 출처, 안내)는 '자세히'에 둔다 */
+function headerHtml(kind, id) {
+  const nmk = nlabel(kind + '|' + id), enk = enOf(kind + '|' + id);
+  /* 꼬리표·바깥 링크(chips)는 '자세히' 팝오버 맨 위로, 자세히는 이름 옆 아이콘 하나 (머리말 높이를 줄인다). tag 는 이름 옆에 그대로 둘 짧은 표시 */
+  const meta = (top, chips, more, sub, tag) => { const pm = (chips ? `<div class="row">${chips}</div>` : '') + (more || ''); return `<div class="dhead"><div class="dl1"><span class="kind k-${kind}">${esc(TYPE_KO[kind] || kind)}</span><span class="dtop">${top || ''}</span></div>
+    <div class="dtl"><h2 title="${esc(nmk)}">${esc(nmk)}</h2>${pm ? `<button type="button" class="dinfo" id="dmore" aria-haspopup="dialog" aria-label="자세히" title="자세히">${ic('info')}</button>` : ''}${tag || ''}</div><div class="den" title="${esc(enk)}">${enk ? esc(enk) : '&nbsp;'}</div>
+    <div class="dsub">${sub || ''}</div></div>${pm ? `<template id="dmoreTpl">${pm}</template>` : ''}`; };
+  if (kind === 'D' && isEnt(id)) {  /* 병명 (지금은 코드 화면의 탭으로 열리지만 혹시 바로 올 때) */
+    const e = ENT.get(id) || {}, sib = (ENTS.get(e.kcd) || []).filter(k => k !== id);
+    return meta(`${esc(dotted(e.kcd))} 아래 · <span class="mono">${esc(e.mondo || '')}</span>`,
+      `<span class="badge">이름 출처: ${esc(SRCN_KO(e.src))}</span><span class="badge">KCD 연결: ${HOW_KO(e.how)}</span>`,
+      `<p>${sib.length ? '같은 코드에 다른 병명이 있어, 코드 이름으로 적힌 연결은 물려받지 않습니다 (기전이 다를 수 있음).' : '스키마에서 병명으로 적힌 연결은 이 병명에, 코드 이름으로 적힌 연결은 코드에 붙어 있고 진료 탭은 둘을 합쳐 씁니다.'}</p>`,
+      `<span class="muted">KCD</span><button class="fk" data-focus="D|${esc(e.kcd)}">${esc(dotted(e.kcd))} ${esc(nm.D(e.kcd))}</button>${sib.map(k => `<button class="fk" data-focus="D|${esc(k)}">${esc(nm.D(k))}</button>`).join('')}`);
+  }
+  if (kind === 'D') {
+    const r = byPk('disease', id), kids = byCol('disease', 'parent', id), incl = (r && val('disease', r, 'inclusions_ko')) || [];
+    const par = r && val('disease', r, 'parent'), ents = ENTS.get(id) || [], sames = ENT_SAME.get(id) || [], tabbed = ents.length >= 2 || (ents.length >= 1 && sames.length > 0);
+    const hasData = k => SKREF.has('D|' + k) || ENTS.has(k) || (GO.get('D|' + k) || []).length > 0;
+    const kidKeys = kids.map(z => val('disease', z, 'kcd')).sort((a, b) => hasData(b) - hasData(a) || a.localeCompare(b));
+    const kidHtml = !kidKeys.length ? '' : id.length >= 4
+      ? `<h4>세부 코드 ${kidKeys.length} <span class="muted">· 한국 확장, 이 코드에 합침</span></h4><div class="row">${kidKeys.map(k => `<span class="arr" title="${esc(k)}">${esc(dotted(k))} ${esc(short(nm.D(k), 24))}</span>`).join('')}</div>`
+      : `<h4>하위 코드 ${kidKeys.length}</h4><div class="row">${kidKeys.map(k => `<button class="fk${hasData(k) ? '' : ' dim'}" data-focus="D|${esc(k)}" title="${hasData(k) ? '연결 자료 있음' : '연결 자료 없음'}">${esc(dotted(k))} ${esc(short(nm.D(k), 24))}</button>`).join('')}</div>`;
+    const ei = k => { const e = ENT.get(k); return `<h4>병명 ${esc(e.ko || '')}</h4><p>${esc(e.en)} · <span class="mono">${esc(e.mondo)}</span> · 이름 출처: ${esc(SRCN_KO(e.src))} · KCD 연결: ${HOW_KO(e.how)}${ents.length >= 2 ? '. 같은 코드의 다른 병명과 기전이 다를 수 있어, 코드 이름으로 적힌 스키마 연결은 물려받지 않습니다.' : ''}</p>`; };
+    const more = (par ? `<h4>상위 코드</h4><div class="row"><button class="fk" data-focus="D|${esc(par)}">${esc(dotted(par))} ${esc(nm.D(par))}</button></div>` : '') + kidHtml
+      + (incl.length ? `<h4>포함 용어</h4><div class="row">${incl.map(z => `<span class="arr">${esc(z)}</span>`).join('')}</div>` : '')
+      + (!x.etab && sames.length ? `<h4>이 코드와 같은 병명</h4>${sames.map(k => { const e = ENT.get(k); return `<p>${esc(e.ko || '')} · ${esc(e.en)} · <span class="mono">${esc(e.mondo)}</span> · 이름 출처: ${esc(SRCN_KO(e.src))} · KCD 연결: ${HOW_KO(e.how)}</p>`; }).join('')}<p>코드 이름과 같은 병이라 그래프에서는 이 코드와 한 노드로 합쳐, 이 병명의 표현형·기전도 코드에 붙어 보입니다.</p>` : '')
+      + (x.etab ? ei(x.etab) : soleEnt(id) ? ei(ents[0]) : ents.length >= 1 && tabbed ? `<p>이 코드에는 다른 병명 ${ents.length}개가 더 들어 있습니다. 탭에서 병명을 고르면 그 병의 기전·표현형을 봅니다.</p>` : '');
+    const mk = mechKind(x.etab || id), mkTag = mk === 'mech' ? '' : `<button type="button" class="nomech mk-${mk || 'none'}" id="dmech" title="기전 자료 상태">${esc(MK_TAG[mk || ''][0])}</button>`;
+    const sub = tabbed
+      ? `<div class="seg etabs" role="tablist" aria-label="병명">${[['', sames.length ? nm.D(id) : '공통 · 분류'], ...ents.map(k => [k, nm.D(k)])].map(([k, l]) => `<button role="tab" data-etab="${esc(k)}" aria-pressed="${k === (x.etab || '')}" aria-selected="${k === (x.etab || '')}">${esc(l)}</button>`).join('')}</div>`
+      : `<span class="muted">연결된 소견</span><b>${fmt(findCount(x.etab || id))}개</b>`;
+    return meta(`<span class="mono">${dotted(id)}</span> · ${esc(r ? val('disease', r, 'chapter') : '')}`, '', more, sub, mkTag);
+  }
+  if (kind === 'F') { const r = byPk('finding', id); return meta(`${esc(KIND_KO[val('finding', r, 'kind')])} 소견${val('finding', r, 'hpo_id') ? ` · <span class="mono">${val('finding', r, 'hpo_id')}</span>` : ''}`, (PRf.get(id) || []).map(p => `<span class="badge">주호소로 쓰임: ${esc(val('presentation', p, 'name_ko'))}</span>`).join('')); }
+  if (kind === 'H') return meta(`HPO 표현형 · <span class="mono">${id}</span>`, `<a class="fk" href="https://hpo.jax.org/browse/term/${id}" target="_blank" rel="noopener">HPO에서 보기</a>`);
+  if (kind === 'M') return meta('스키마 기전', '');
+  if (kind === 'X') { const m = DMm.get(id); return meta(`DisMech ${isEtio('X|' + id) ? '병인' : '기전 ' + ((m && m.depth) || '') + '차'} · ${esc(dmDisease(id))}`, `<span class="badge mono">${esc(m ? m.mondo : '')}</span>`); }
+  if (kind === 'A') { const vs = ANV.get(id) || [], props = [...new Set(vs.map(c => PROP_KO[LOINC[c][3]] || LOINC[c][3]).filter(Boolean))], syss = [...new Set(vs.map(c => sysKo(LOINC[c][4])).filter(Boolean))];
+    return meta(`세부 검사 ${vs.length}종 (LOINC)`, `${props.map(z => `<span class="badge">${esc(z)}</span>`).join('')}${syss.map(z => `<span class="arr">${esc(z)}</span>`).join('')}`, props.length + syss.length > 4 ? `<h4>성질</h4><div class="row">${props.map(z => `<span class="badge">${esc(z)}</span>`).join('')}</div><h4>검체</h4><div class="row">${syss.map(z => `<span class="arr">${esc(z)}</span>`).join('')}</div>` : ''); }
+  if (kind === 'C') { const n = FN['CDM:' + id] || []; return meta(`AI 기전 (Claude) · ${esc(n[4] ? nm.D(n[4]) : '')} · 의학과 검수 전`, `<span class="conf c${n[6]}">신뢰도 ${CONF_KO[n[6]] || '-'}</span>${n[5] ? `<button class="fk" data-focus="${esc(nid(n[5]))}">같은 개념: ${esc(nlabel(nid(n[5])))}</button>` : ''}${n[4] ? `<button class="fk" data-focus="D|${esc(n[4])}">이 AI 기전의 질병</button>` : ''}`, n[7] ? `<h4>검토 메모</h4><p>${esc(n[7])}</p>` : ''); }
+  if (kind === 'G') return meta(`<span class="mono">${esc(id)}</span> · Orphanet 원인 유전자`, `<a class="fk" href="https://www.genenames.org/data/gene-symbol-report/#!/hgnc_id/${esc(id)}" target="_blank" rel="noopener">HGNC에서 보기</a>`);
+  if (kind === 'P') return meta(`<span class="mono">${esc(id)}</span>`, `<a class="fk" href="https://amigo.geneontology.org/amigo/term/${esc(id)}" target="_blank" rel="noopener">GO에서 보기</a>`);
+  if (kind === 'E') return meta('스키마에 적힌 표기', '');
+  return meta('', '');
+}
+
+/* 필터·범례·도움말 */
+const XF_DEF = {sub: true, hpoa: true, fillA: true, fillB: true, hyp: false};
+const XF_LIST = [['sub', '하위 질병의 표현형·기전 포함'], ['hpoa', 'HPOA 포함 (제출본에서 빠지는 출처)'], ['fillA', '유전자 자동 연결 (A)'], ['fillB', 'AI 기전 (Claude, B)'], ['hyp', '가설 포함 (신뢰도 가장 낮음)']];
+if (D.public) { XF_LIST.splice(XF_LIST.findIndex(([k]) => k === 'hpoa'), 1); }  /* 공개판에는 HPOA 자료가 없다 */
+const xfChanged = () => XF_LIST.filter(([k]) => xf[k] !== XF_DEF[k]).length;
+const MODK = /Mac|iPhone|iPad/.test(navigator.platform || '') ? '⌘' : 'Ctrl';
+const kb = t => `<kbd>${t}</kbd>`;
+const GZHELP = (() => {
+  const row = (icon, how, what) => `<div class="hr"><span class="ms" aria-hidden="true">${icon}</span><span class="how">${how}</span><span class="what">${what}</span></div>`;
+  return `<div class="help">
+  <h4>보기</h4>
+  ${row('pan_tool', '끌기', '그래프 창 안에서 이동')}
+  ${row('swap_horiz', `${kb('Shift')} + 휠`, '그래프 좌우 이동')}
+  ${row('zoom_in', `${kb(MODK)} + 휠 · 두 손가락`, `확대·축소 (${kb('+')} ${kb('−')} ${kb('0')} 키도)`)}
+  <h4>강조·선택</h4>
+  ${row('visibility', '마우스 올리기', '이어진 경로를 살짝 강조 · 색만 보일 만큼 멀면 이름도 띄움')}
+  ${row('link', '선 위에 잠깐 멈추기', '그 연결의 출처')}
+  ${row('ads_click', '누르기 · 우클릭', '이어진 경로 전체를 선택해 강조')}
+  ${row('close', `빈 곳 누르기 · ${kb('Esc')}`, '선택 해제')}
+  <h4>이동</h4>
+  ${row('touch_app', '한 번 더 누르기 · 두 번 누르기 · 선택 중 강조된 노드 누르기', '그 노드 화면으로')}
+  ${row('undo', `${kb(MODK)} + ${kb('Z')} · ${kb('Alt')} + ${kb('←')}`, '뒤로 (앞으로는 Shift 를 더해서)')}
+</div>`;
+})();
+document.addEventListener('click', e => {
+  const t = e.target.closest('#xfBtn, #lgBtn, #dmore, #dmech, .ghelp, .ginfo'); if (!t) return;
+  if (t.id === 'xfBtn') pop(t, `<h4>그래프에 넣을 연결</h4>${XF_LIST.map(([k, l]) => `<label><input type="checkbox" data-xf="${k}" ${xf[k] ? 'checked' : ''}> ${esc(l)}</label>`).join('')}<p style="margin:8px 0 0;font-size:12.5px">닿는 연결은 모두 그리고, 스크롤에 맞춰 이어 그립니다.</p>`, el => el.addEventListener('change', ev => {
+    const c = ev.target.closest('[data-xf]'); if (!c) return; xf[c.dataset.xf] = c.checked; xf.all = false; PROF.clear();
+    x.keepPop = true; focusOn(x.cur, x.cur === 'D' && x.etab ? x.etab : x.id); x.keepPop = false;
+    const nb = $('#xfBtn'); if (POP && nb) POP.btn = nb;
+  }));
+  else if (t.id === 'lgBtn') pop(t, `<h4>선과 상자</h4>${LEGEND}`);
+  else if (t.id === 'dmore') pop(t, $('#dmoreTpl').innerHTML);
+  else if (t.id === 'dmech') pop(t, noMechNote(mechKind(x.etab || x.id)));
+  else if (t.classList.contains('ghelp')) pop(t, GZHELP);
+  else if (t.classList.contains('ginfo')) pop(t, `<p>${esc(t.dataset.desc)}</p>`);
+});
+
+function focusOn(kind, id, fromList) {
+  x.hlLoinc = null;
+  if (kind === 'T') { x.hlLoinc = id; id = (LOINC[id] && LOINC[id][7]) || id; kind = 'A'; }  /* LOINC 코드는 그 검사 묶음 화면에서 그 행을 표시 */
+  let tab = '';
+  if (kind === 'D') {  /* 병명은 따로 화면이 없고, 속한 KCD 코드 화면의 탭이다 */
+    if (isEnt(id)) { tab = id; id = entCode(id); } else if (x.cur === 'D' && x.id === id) tab = x.etab || '';
+    const ents = ENTS.get(id) || [];
+    if (soleEnt(id)) tab = ents[0]; else if (!ents.includes(tab)) tab = '';
+  }
+  if (!x.keepPop) closePop();
+  const same = x.cur === kind && x.id === id;
+  if (!same) xf.all = false;
+  /* 뒤로가기는 노드를 따라 들어간 길만 기억한다. 왼쪽 목록이나 진료 탭에서 새로 고르면 길을 새로 시작한다.
+     깊이 경로(path)는 처음 고른 노드부터 지금까지: 이미 경로에 있는 노드로 가면 그 자리까지 잘린다 (감염 › 상세불명 › 감염 = 감염) */
+  const prev = x.cur && !same ? curEntry() : null, tkey = kind + '|' + (kind === 'D' && tab ? tab : id);
+  if (fromList) { x.hist = []; x.fwd = []; x.path = []; }
+  else if (prev) {
+    x.hist.push(prev);
+    if (!x.nav) { x.fwd = []; const i = x.path.findIndex(e => e[0] + '|' + e[1] === tkey); if (i >= 0) x.path = x.path.slice(0, i); else x.path.push(prev); }
+  }
+  x.cur = kind; x.id = id; x.etab = tab;
+  const mode = {G: 'mechanism', P: 'mechanism', C: 'mechanism', D: 'disease', F: 'finding', H: 'finding', M: 'mechanism', X: 'mechanism', T: 'test', A: 'test'}[kind];
+  if (mode && x.mode !== mode && !fromList) { x.mode = mode; document.querySelectorAll('#xseg button').forEach(z => z.setAttribute('aria-pressed', z.dataset.mode === mode)); renderList(); }
+  else if (x.lkey !== [x.mode, x.q || '', x.sort].join('\u0001')) renderList(); else syncListSel();
+  const MK = /Mac|iPhone|iPad/.test(navigator.platform || '') ? '⌘' : 'Ctrl';
+  const hb = x.hist.at(-1), fb = x.fwd.at(-1), nf = xfChanged();
+  /* 지나온 길: 처음 고른 노드 › … › 지금 노드. 누르면 그 단계로 바로 돌아간다. 길면 가운데를 … 로 접는다 */
+  const lab = e => nlabel(e[0] + '|' + e[1]), H = x.path, cb = i => `<button type="button" class="cb" data-ci="${i}" title="${esc(lab(H[i]))}">${esc(short(lab(H[i]), 16))}</button>`, sep = '<span class="ms csep" aria-hidden="true">chevron_right</span>';
+  const mid = H.length > 4 ? H.slice(1, H.length - 2).map((e, j) => j + 1) : [];
+  const crumbs = (H.length > 4 ? [cb(0), `<button type="button" class="cb more" id="cbMore" data-mid="${mid.join(',')}" title="중간 ${mid.length}단계 보기">…</button>`, cb(H.length - 2), cb(H.length - 1)] : H.map((e, i) => cb(i)))
+    .concat(`<span class="cb cur" title="${esc(nlabel(kind + '|' + id))}">${esc(short(nlabel(kind === 'D' && tab ? 'D|' + tab : kind + '|' + id), 18))}</span>`).join(sep);
+  const nav = `<div class="xnav"><button class="tbtn icon" id="xback" ${hb ? '' : 'disabled'} title="뒤로${hb ? ': ' + esc(lab(hb)) : ''} (${MK}+Z · Alt+←)" aria-label="뒤로">${ic('arrow_back')}</button><button class="tbtn icon" id="xfwd" ${fb ? '' : 'disabled'} title="앞으로${fb ? ': ' + esc(lab(fb)) : ''} (${MK}+Shift+Z · Alt+→)" aria-label="앞으로">${ic('arrow_forward')}</button><nav class="crumbs2" aria-label="처음부터 지금까지의 경로">${crumbs}</nav><button class="tbtn" id="xfBtn" aria-haspopup="dialog">${ic('filter_list', '필터')}${nf ? `<span class="dot">${nf}</span>` : ''}</button><button class="tbtn" id="lgBtn" aria-haspopup="dialog">${ic('legend_toggle', '범례')}</button></div>`;
+  const key = kind === 'D' && x.etab ? 'D|' + x.etab : kind + '|' + id;  /* 병명 탭이면 그 병명의 그래프 */
+  let h = nav + headerHtml(kind, id);
+  h += graphsHtml(kind, key);
+  h += edgeTable(key, -1) + edgeTable(key, 1);
+  if (kind === 'D') {
+    const co = (GO.get(key) || []).filter(e => e.p === 'has_phenotype' && e.o[0] === 'H' && HP2D.has(e.o.slice(2)) && edgeOk(e))
+      .map(e => ({term: bi(nm.H(e.o.slice(2)), en.H(e.o.slice(2))), other: 'D|' + HP2D.get(e.o.slice(2)), how: 'HPO 표현형 이름이 이 질병 이름과 같음', e}))
+      .concat((CO.get(key) || []).filter(edgeOk).map(e => ({term: bi(mondoKo(e.term), mondoEn(e.term)), other: e.other, how: e.rev ? '다른 질병의 표현형 목록에 이 질병이 나옴' : '표현형 목록에 질병이 적힘', e})));
+    if (co.length) h += `<div class="dsec"><h3>동반 보고 질병 ${co.length}개 <span class="muted" style="font-weight:400;font-size:12.5px">· 표현형 목록에 질병이 나온 것. 합병증·위험·연관이 섞여 있고 방향을 알 수 없어 인과 그래프로는 잇지 않습니다</span></h3><div class="tablewrap"><table><thead><tr><th>표현형 자리의 용어</th><th>질병</th><th>관계</th><th>출처</th><th>빈도</th></tr></thead><tbody>${co.sort((p, q) => (q.e.f || 0) - (p.e.f || 0)).map(c => `<tr><td>${c.term}</td><td>${c.other[0] === 'D' ? `<button class="fk" data-focus="${esc(c.other)}">${bi(c.other.slice(2) + ' ' + nm.D(c.other.slice(2)), en.D(c.other.slice(2)))}</button>` : esc(c.other)}</td><td>${esc(c.how)}</td><td>${esc((c.e.src || '').split(',').map(z => SRC_LABEL[z] || z).join(', '))}</td><td>${esc(FREQ_KO(c.e.f))}${c.e.depth ? ' · 하위 질병에서' : ''}</td></tr>`).join('')}</tbody></table></div></div>`;
+  }
+  $('#xdetail').innerHTML = h;
+  bindXf(id, kind);
+  afterRender();
+  if (!same && !x.nav) { scrollTo(0, 0); if (x.clicked) focusRoot(); }  /* 새 화면은 늘 맨 위 · 그래프는 왼쪽 위에서 시작 */
+  x.clicked = false;
+}
+/* 노드를 눌러 넘어왔으면, 새 화면 첫 그래프의 그 노드(뿌리)에 초점과 강조를 준다 */
+function focusRoot() {
+  const w = [...document.querySelectorAll('#xdetail .xwrap[data-gi]')].find(z => { const g = getG(z.dataset.gi); return g && g.lay.rootId; });
+  if (!w) return;
+  const root = getG(w.dataset.gi).lay.rootId;
+  w.dataset.hov = root; w._hl = null; paintGraphs(true);
+  const n = [...w.querySelectorAll('.xn')].find(z => z.dataset.id === root);
+  if (n) { n.classList.add('clicked'); n.focus({preventScroll: true}); }
+}
+function bindXf() {
+  document.querySelectorAll('#xdetail .etsent').forEach(t => etObs ? etObs.observe(t) : null);
+  document.querySelectorAll('#xdetail .lzsent').forEach(t => lzObs ? lzObs.observe(t) : null);
+}
+function afterRender() {
+  const cr = document.querySelector('#xdetail .crumbs2'); if (cr) cr.scrollLeft = cr.scrollWidth;  /* 지나온 길은 끝(지금 노드)이 보이게 */
+  const bk = $('#xback'); if (bk) bk.onclick = goBack;
+  const fw = $('#xfwd'); if (fw) fw.onclick = goFwd;
+  document.querySelectorAll('#xdetail [data-etab]').forEach(b => b.onclick = () => { x.etab = b.dataset.etab; focusOn('D', b.dataset.etab || x.id); });
+  bindGraphs();
+}
+
+document.addEventListener('click', e => { const b = e.target.closest('[data-focus]'); if (!b) return; const [k, i] = b.dataset.focus.split('|'); focusOn(k, i); });
+
+/* ── 진료: 넣은 소견을 공통으로 가진 질병을 보여 준다 (확률이 아니라 공통점) ──
+   질병마다 DB에서 닿는 소견 목록(스키마·HPO·DisMech, 기전 경유 포함)을 만들고, '있음' 소견과 겹치는 수로 정렬한다.
+   '없음' 소견이 그 질병의 목록에 있으면 어긋남으로 센다. 다음에 확인할 것은 공통 수가 가장 많은 후보 묶음을 반으로 잘 가르는 소견 */
+const CS = {items: new Map(), cc: '', open: 60, q: ''};  /* items: 노드 → 'present' | 'absent' */
+const edgeP = e => {
+  if (e.fill) return (e.depth ? 0.5 : 1) * [0, 0.3, 0.45, 0.55][e.conf || 0];  /* 채움(초안·자동)은 신뢰도대로 약하게 */
+  let p;
+  if (e.p === 'has_phenotype') p = (e.f != null ? e.f : e.src === 'skku_lrc_pbl' ? 0.35 : 0.4) * (e.cov != null ? e.cov : 1);  /* 스키마 연결은 '원인이 될 수 있다'라 빈도보다 약하게 */  /* 묶음 코드는 '그 소견이 있는 질병 비율 × 빈도' */
+  else if (e.p === 'manifests_as') p = e.src === 'skku_lrc_pbl' ? 0.6 : e.src === 'dismech' ? 0.6 : 0.5;
+  else p = e.src === 'skku_lrc_pbl' ? 0.85 : e.src === 'dismech' ? 0.8 : e.src === 'claude_draft' ? 0.7 : 0.6;
+  return e.depth ? p * 0.5 : p;  /* 하위 질병에서 올라온 것은 반만 */
+};
+const PROF = new Map();
+/* 질병 → {소견: [확률, 경로]} 가장 센 경로를 고른다 (소견은 끝점, 다른 질병으로는 넘어가지 않는다) */
+function profile(d) {
+  if (PROF.has(d)) return PROF.get(d);
+  const par = isEnt(d.slice(2)) && soleEnt(entCode(d.slice(2))) ? 'D|' + entCode(d.slice(2)) : null;  /* 병명이 하나뿐인 코드면 코드에 남은 연결도 물려받는다 (여럿이면 기전이 다를 수 있어 물려받지 않는다: 윌슨병 ≠ 멘케스병) */
+  const best = new Map([[d, 1]]), from = new Map(), q = [d];
+  if (par) { best.set(par, 1); q.push(par); }
+  for (let it = 0; q.length && it < 20000; it++) {
+    const a = q.shift(), sa = best.get(a);
+    if (a !== d && a !== par && ('FHD'.includes(a[0]))) continue;
+    (GO.get(a) || []).forEach(e => {
+      if (!CAUSAL.has(e.p) || !edgeOk(e) || e.pol === 'absent' || e.o === d || e.o === par) return;
+      const s = sa * edgeP(e);
+      if (s > (best.get(e.o) || 0) + 1e-9) { best.set(e.o, s); from.set(e.o, a); q.push(e.o); }
+    });
+  }
+  const out = new Map();
+  best.forEach((s, n) => { if ('FH'.includes(n[0])) { const path = []; let c = from.get(n); while (c && c !== d && c !== par) { path.unshift(c); c = from.get(c); } out.set(n, [Math.min(0.95, Math.max(0.03, s)), path]); } });
+  PROF.set(d, out);
+  return out;
+}
+/* 후보: 있음 소견에서 거슬러 닿는 질병 */
+/* HPO 동의어와 하위 용어: '빈맥'을 넣으면 '동성 빈맥'처럼 더 구체적인 소견을 가진 병도 맞음으로 센다 (반대 방향은 아님).
+   hpo_tree = 쓰인 용어와 그 조상들의 부모 목록 (내보내기에서). 노드 ID ↔ HPO: F 노드는 소견 사전의 hpo_id */
+const HSYN = D.hpo_syn || {}, HPAR = D.hpo_tree || {};
+let HCH = null;
+const hpoOfNode = id => id[0] === 'H' ? id.slice(2) : id[0] === 'F' ? (val('finding', byPk('finding', id.slice(2)), 'hpo_id') || null) : null;
+const nodeOfHpo = h => HPO2F.has(h) ? 'F|' + HPO2F.get(h) : 'H|' + h;
+const DESC = new Map();
+function descNodes(f) {  /* f 와 그 하위 용어 노드들 (그래프에 있는 것만) */
+  if (DESC.has(f)) return DESC.get(f);
+  if (!HCH) { HCH = new Map(); Object.entries(HPAR).forEach(([c, ps]) => ps.forEach(p => push(HCH, p, c))); }
+  const out = new Set([f]), h = hpoOfNode(f);
+  if (h) { const st = [h], seen = new Set([h]); while (st.length) { const a = st.pop(); (HCH.get(a) || []).forEach(c => { if (seen.has(c)) return; seen.add(c); st.push(c); const n = nodeOfHpo(c); if (GI.has(n)) out.add(n); }); } }
+  DESC.set(f, out); return out;
+}
+function candidates() {
+  const set = new Set();
+  const add = n => { const c = n.slice(2); if (!isEnt(c) && soleEnt(c)) set.add('D|' + ENTS.get(c)[0]); else set.add(n); };  /* 병명이 하나뿐인 코드는 그 병명으로. 여럿이면 코드(분류)에 남은 연결은 코드 그대로 후보 */
+  [...CS.items].filter(([, v]) => v === 'present').forEach(([f]) => descNodes(f).forEach(g => reachTree(g, -1).nodes.forEach(n => { if (n[0] === 'D') add(n); })));
+  return [...set];
+}
+function rank() {
+  const items = [...CS.items], pres = items.filter(([, v]) => v === 'present').map(([f]) => f), abs = items.filter(([, v]) => v === 'absent').map(([f]) => f);
+  return candidates().map(d => {
+    const prof = profile(d), ev = [];
+    let n = 0, c = 0, s = 0;
+    const best = f => { let b = null, by = null; descNodes(f).forEach(g => { const r = prof.get(g); if (r && (!b || r[0] > b[0])) { b = r; by = g; } }); return [b, by]; };  /* 그 소견 또는 하위 용어 중 가장 센 것 */
+    pres.forEach(f => { const [r, by] = best(f); if (r) { n++; s += r[0]; } ev.push({f, v: 'present', hit: !!r, by}); });
+    abs.forEach(f => { const [r, by] = best(f); if (r) { c++; ev.push({f, v: 'absent', hit: true, by}); } });
+    return {d, n, c, s, ev, total: pres.length};
+  }).sort((a, b) => b.n - a.n || a.c - b.c || ((SKREF.has(b.d) || SKREF.has('D|' + entCode(b.d.slice(2)))) - (SKREF.has(a.d) || SKREF.has('D|' + entCode(a.d.slice(2))))) || b.s - a.s || nlabel(a.d).localeCompare(nlabel(b.d)));
+}
+/* 다음에 확인할 것: 맨 위 묶음(공통 수 최대·어긋남 최소)을 반으로 가장 잘 가르는 소견 */
+function nextQuestions(rows) {
+  if (rows.length < 2) return [];
+  let grp = rows.filter(r => r.n === rows[0].n && r.c === rows[0].c);
+  if (grp.length < 2) grp = rows.slice(0, 15);
+  const G = grp.length, asked = new Set(CS.items.keys()), cnt = new Map();
+  grp.forEach(r => profile(r.d).forEach((v, f) => { if (!asked.has(f) && !(f[0] === 'H' && HP2D.has(f.slice(2))) && !isObsolete(f)) cnt.set(f, (cnt.get(f) || 0) + 1); }));
+  return [...cnt].filter(([, k]) => k < G).map(([f, k]) => ({f, k, G, bal: Math.min(k, G - k) / G}))
+    .sort((a, b) => b.bal - a.bal || b.k - a.k || nlabel(a.f).localeCompare(nlabel(b.f))).slice(0, 8);
+}
+function strategy(rows) {
+  const top = rows.filter(r => r.n === rows[0].n && r.c === rows[0].c).length;
+  return `있음 ${rows[0].n}/${rows[0].total}개가 공통인 후보 ${top}개${top < 2 ? ' (적어서 상위 15개 기준)' : ''}를 반으로 가르는 소견`;
+}
+/* 검색: 소견(성균관의대·HPO)과 검사 묶음 */
+const isObsolete = id => id[0] === 'H' && /^obsolete/i.test(enOf(id) || '');  /* 폐기된 HPO 용어는 묻거나 찾지 않는다 */
+/* 예시 증례: 공개 증례 보고에서 가져온 '처음엔 오진, 나중에 확진' 사례. 소견은 우리 DB의 소견 ID로 옮겼다 */
+const isTruth = (d, ex) => d === ex.truth || d.startsWith(ex.truth + '@');  /* KCD 코드가 정답이면 그 아래 병명도 정답 */
+const EXAMPLES = [
+  {name: '20세 여성 · 복통·구토·검은 소변', truth: 'D|E802@MONDO:0008294', dx: '급성 간헐성 포르피린증 (E80.2)', mis: '요로감염', src: 'https://pmc.ncbi.nlm.nih.gov/articles/PMC11512492',
+   note: '심한 복통·지속 구토·빈맥·고혈압·검은 소변, 탈수. 과거 SIADH로 중환자실 입원, 불안·우울. 요중 PBG 상승으로 확진',
+   items: ['F|abdominal_pain', 'F|vomiting', 'F|tachycardia', 'F|hypertension', 'H|HP:0040319', 'F|dehydration', 'F|anemia', 'F|hypercalcemia', 'F|anxiety', 'F|depressed_mood']},
+  {name: '23세 여성 · 복통·구토·저나트륨 103', truth: 'D|E802', dx: '급성 간성 포르피린증 (E80.2 아래 병명이면 정답)', mis: '세균성 위장염', src: 'https://pmc.ncbi.nlm.nih.gov/articles/PMC12908503',
+   note: '6일간 미만성 복통·반복 구토·근육통·실신 전구 증상. 소적혈구성 빈혈, 정상 체액량의 저나트륨혈증(SIADH 양상), AST·CK 상승',
+   items: ['F|abdominal_pain', 'F|vomiting', 'F|myalgia', 'H|HP:0031972', 'H|HP:0001935', 'F|hyponatremia', 'H|HP:0003113', 'H|HP:0031956', 'F|anxiety']},
+  {name: '61세 남성 · 복부팽만·설사·체중 18kg 감소', truth: 'D|K908@MONDO:0005116', dx: '휘플병 (K90.8)', mis: '기능성 위장장애·염증성 장질환 등', src: 'https://pmc.ncbi.nlm.nih.gov/articles/PMC12050012',
+   note: '6개월간 복부팽만·구역·식욕부진·식후 포만감·수양성 설사, 체중 25% 감소. 창백·피부 과색소침착·극도의 쇠약, 철결핍 빈혈·저알부민혈증, 장간막 림프절병증. 십이지장 생검 PAS 양성',
+   items: ['F|abdominal_distension', 'F|nausea', 'F|appetite_loss', 'F|weight_loss', 'F|diarrhea', 'F|arthralgia', 'H|HP:0000980', 'H|HP:0000953', 'F|cachexia', 'H|HP:0001891', 'F|hypoalbuminemia']},
+  {name: '19세 여성 · 원인 불명 열·인후통·페리틴 9,643', truth: 'D|M061@MONDO:0019355', dx: '성인형 스틸병 (M06.1)', mis: '혈구탐식증후군', src: 'https://pmc.ncbi.nlm.nih.gov/articles/PMC13428636',
+   note: '하루 두 번 오르는 열, 인후통·두통, 인두 발적. 빈혈·혈소판감소·CRP 상승·비장비대, 간효소·ESR·페리틴 상승, 열과 함께 나타났다 사라지는 연어색 발진, 이동성 다관절통, ANA 1:160',
+   items: ['F|fever', 'H|HP:0025439', 'F|headache', 'F|anemia', 'F|thrombocytopenia', 'F|crp_high', 'F|splenomegaly', 'H|HP:0003565', 'H|HP:0003281', 'H|HP:0040186', 'F|arthralgia', 'H|HP:0003493']},
+  {name: '33세 여성 · 황달·복수·쿰스 양성 용혈', truth: 'D|E830@MONDO:0010200', dx: '윌슨병 (E83.0)', mis: '자가면역 간염', src: 'https://pmc.ncbi.nlm.nih.gov/articles/PMC12252758',
+   note: '2주간 황달, 복수(SAAG>1.1). 빈혈·INR 2.4·알부민 1.8, AST>ALT 상승, 쿰스 양성 용혈빈혈, ANA 1:160·IgG 상승으로 자가면역 간염 의심. 세룰로플라스민 정상, 24시간 요중 구리 상승',
+   items: ['F|jaundice', 'F|ascites', 'F|hyperbilirubinemia', 'F|inr_prolonged', 'F|hypoalbuminemia', 'H|HP:0031956', 'H|HP:0001890', 'H|HP:0003493', 'H|HP:0003565']},
+];
+let CIDX = null;
+function consultIndex() {
+  if (CIDX) return CIDX;
+  const seen = new Set(), out = [];
+  const add = id => { if (seen.has(id) || isObsolete(id)) return; seen.add(id); const h = hpoOfNode(id); out.push({id, ko: nlabel(id), en: enOf(id) || '', syn: (h && HSYN[h] || []).join(' | ').toLowerCase()}); };
+  T.finding.rows.forEach(r => add('F|' + val('finding', r, 'id')));
+  GI.forEach((es, k) => { if (k[0] === 'H' && es.some(e => e.p === 'has_phenotype' || e.p === 'manifests_as')) add(k); });
+  GO.forEach((es, k) => { if (k[0] === 'A') add(k); });
+  CIDX = out;
+  return out;
+}
+const pathTxt = path => path.filter(n => 'MXC'.includes(n[0])).map(n => short(nlabel(n), 14)).join(' → ');
+/* 감별 그래프: 상위 후보 질병에서 '있음' 소견까지 가장 센 경로를 잇는다 */
+function consultGraph(rows) {
+  const ex = CS.ex != null ? EXAMPLES[CS.ex] : null, top = rows.slice(0, 12), pres = [...CS.items].filter(([, v]) => v === 'present').map(([f]) => f);
+  if (ex) { const t = rows.find(r => isTruth(r.d, ex)); if (t && !top.includes(t)) top.push(t); }  /* 예시의 정답은 순위 밖이어도 함께 그린다 */
+  const nodes = new Set(pres), edges = new Set(), pos = new Map();
+  top.forEach(r => {
+    nodes.add(r.d);
+    pres.forEach(f => {
+      const pr = profile(r.d).get(f); if (!pr) return;
+      const chain = [r.d, ...pr[1], f];
+      chain.forEach((n, i) => { nodes.add(n); if (i > 0 && n !== f) pos.set(n, Math.max(pos.get(n) || 0, i)); });
+      for (let i = 0; i < chain.length - 1; i++) { const e = (GO.get(chain[i]) || []).find(z => z.o === chain[i + 1] && CAUSAL.has(z.p)); if (e) edges.add(e); }
+    });
+  });
+  let maxC = 0; pos.forEach(v => { maxC = Math.max(maxC, v); });
+  const L = new Map([...nodes].map(n => [n, n[0] === 'D' && !pres.includes(n) ? 0 : pres.includes(n) ? maxC + 1 : pos.get(n) || 1]));
+  const sub = new Map(), rank = new Map();
+  top.forEach(r => { const i = rows.indexOf(r); sub.set(r.d, `${ex && isTruth(r.d, ex) ? '★정답 · ' : ''}${i + 1}위 · 공통 ${r.n}/${r.total}${r.c ? ' · 어긋남 ' + r.c : ''} · ${r.d.slice(2)}`); rank.set(r.d, 1e6 - i); });
+  pres.forEach(f => sub.set(f, '입력 · 있음'));
+  return {root: null, dir: 1, nodes: [...nodes], edges: [...edges], L, maxC, kind: 'consult', sub, rank};
+}
+function renderConsult() {
+  const el = $('#consult'); if (!el) return;
+  CGV.length = 0;
+  const ex = CS.ex != null ? EXAMPLES[CS.ex] : null;
+  const rows = [...CS.items].some(([, v]) => v === 'present') ? rank() : [], qs = rows.length ? nextQuestions(rows) : [];
+  const checks = [...CS.items].map(([f, v]) => `<li class="ck ${v}"><label><input type="checkbox" class="ctog" data-f="${esc(f)}"${v === 'present' ? ' checked' : ''}> ${esc(nlabel(f))} <span class="muted" style="font-size:11px">${v === 'present' ? '있음' : '없음'}</span></label><button class="cdel" data-f="${esc(f)}" aria-label="빼기">×</button></li>`).join('');
+  const src = d => { const r = SKREF.get(d); return r ? `<span class="badge">성균관의대 스키마 ${r.size}</span>` : '<span class="badge muted">HPO·DisMech</span>'; };
+  const evTxt = r => r.ev.map(({f, v, hit, by}) => { const pr = profile(r.d).get(by || f); const path = pr ? pathTxt(pr[1]) : '';
+    const st = v === 'present' ? (hit ? ['check', '맞음: 이 질병에도 있음'] : ['remove', '자료 없음: 이 질병 목록에 없음']) : ['close', '어긋남: 없음으로 체크했는데 이 질병에 있음'];
+    const sub = by && by !== f ? ` <i>(${esc(short(nlabel(by), 16))})</i>` : '';
+    return `<span class="cev ${v}${hit ? '' : ' none'}" title="${esc(st[1] + (by && by !== f ? ' · 하위 용어 ' + nlabel(by) : '') + (path ? ' · ' + path : ''))}">${ic(st[0])}${esc(short(nlabel(f), 16))}${sub}${path ? ` <i>${esc(short(path, 40))}</i>` : ''}</span>`; }).join('');
+  const list = rows.slice(0, CS.open).map((r, i) => `<li${ex && isTruth(r.d, ex) ? ' class="ctruth"' : ''}><div class="crow"><span class="mono muted">${i + 1}</span>${ex && r.d === ex.truth ? '<span title="예시의 정답">★</span>' : ''}<button class="fk" data-cd="${esc(r.d)}">${esc(nlabel(r.d))}</button><span class="mono muted">${esc(r.d.slice(2))}</span>${src(r.d)}<b class="cpct">맞음 ${r.n}/${r.total}${r.c ? ` <span style="color:var(--s2)">어긋남 ${r.c}</span>` : ''}</b></div><div class="cevs">${evTxt(r)}</div></li>`).join('');
+  const tpos = ex ? rows.findIndex(r => isTruth(r.d, ex)) : -1;
+  const exBox = `<label class="muted" style="font-size:12px">예시 증례 (공개 증례 보고)</label>
+    <select id="cex"><option value="">직접 입력</option>${EXAMPLES.map((e, i) => `<option value="${i}"${CS.ex === i ? ' selected' : ''}>${esc(e.name)}</option>`).join('')}</select>
+    ${ex ? `<div class="cexbox"><p>${esc(ex.note)}</p><p class="muted" style="font-size:12px">처음 오진: ${esc(ex.mis)} · <a href="${ex.src}" target="_blank" rel="noopener">원문</a></p>
+      <details><summary>정답 보기</summary><p><b>${esc(ex.dx)}</b> <span class="mono muted">${esc(dotted(entCode(ex.truth.slice(2))))}</span> → 지금 ${tpos >= 0 ? `<b>${tpos + 1}위</b> / ${fmt(rows.length)} · 공통 ${rows[tpos].n}/${rows[tpos].total}` : '후보에 없음'}</p></details></div>` : ''}`;
+  el.innerHTML = `<div class="cgrid">
+  <div class="cpanel">${exBox}<h3 style="margin-top:12px">소견 체크</h3>
+    <input id="cq" type="search" placeholder="소견·검사 찾기 (예: 부종, proteinuria, 알부민)" autocomplete="off">
+    <div id="cres" class="cres"></div>
+    ${CS.items.size ? `<ul class="cklist">${checks}</ul><p class="muted" style="font-size:12px;margin:4px 0 0">체크 = 있음 · 체크 해제 = 없음</p><button class="back" id="creset">처음부터</button>` : '<p class="muted">소견을 찾아 하나씩 넣으세요. 넣은 소견은 체크(있음)·해제(없음)로 바꿀 수 있습니다.</p>'}
+    <h3 style="margin-top:18px">다음에 확인할 것</h3>
+    ${qs.length ? `<p class="muted" style="font-size:12.5px;margin:0 0 6px">${strategy(rows)}</p><ul class="cqs">${qs.map(qq => `<li><div>${esc(nlabel(qq.f))} <span class="muted" style="font-size:11px">${esc(tko(qq.f))}</span></div><div class="cbar"><i style="width:${(qq.bal * 200).toFixed(0)}%"></i></div><div class="muted" style="font-size:11.5px">있으면 ${qq.k}개 · 없으면 ${qq.G - qq.k}개 후보로 좁혀짐</div><div><button class="cyes" data-f="${esc(qq.f)}">있음</button><button class="cno" data-f="${esc(qq.f)}">없음</button></div></li>`).join('')}</ul>` : '<p class="muted">후보가 둘 이상이면 가장 잘 가르는 소견을 고릅니다.</p>'}
+  </div>
+  <div style="min-width:0">
+    ${rows.length ? graphSec(`감별 그래프 <span class="muted" style="font-weight:400;font-size:12.5px">· 상위 ${Math.min(12, rows.length)}개 후보</span>`, '공통 소견이 많은 후보 질병에서 기전을 거쳐 입력한 소견까지 이어지는 경로. 노드를 누르면 관계 그래프 탭에서 엽니다.', consultGraph(rows), '', false, 'c') : ''}
+    <div class="cpanel" style="margin-top:16px"><h3>감별 목록 ${rows.length ? `<span class="muted" style="font-weight:400;font-size:12.5px">· 후보 ${fmt(rows.length)}개</span>` : ''}</h3>
+      ${rows.length ? `<ol class="clist">${list}</ol>${rows.length > CS.open ? '<div id="cmore" style="height:1px"></div>' : ''}` : '<p class="muted">\'있음\' 소견을 넣으면 그 소견들을 공통으로 가진 질병을 보여 줍니다.</p>'}
+    </div>
+  </div></div>
+  <p class="muted" style="font-size:12px;margin-top:14px">확률이 아니라 공통점입니다. 질병마다 DB(성균관의대 스키마·HPO·DisMech, 기전을 거친 것 포함)에서 닿는 소견 목록을 만들고, 넣은 ‘있음’ 소견과 겹치는 수로 정렬합니다. ‘없음’으로 체크한 소견이 그 질병의 목록에 있으면 어긋남으로 표시합니다. 같은 수면 어긋남이 적은 것, 성균관의대 스키마에 나온 것, 경로가 센 것 순입니다.</p>`;
+  bindConsult();
+  bindGraphs('#consult');
+}
+function cSet(f, v) { if (v) CS.items.set(f, v); else CS.items.delete(f); CS.open = 60; const st = scrollY; renderConsult(); scrollTo(0, st); }
+function bindConsult() {
+  const q = $('#cq'), res = $('#cres');
+  const show = () => {
+    const s = q.value.trim().toLowerCase();
+    if (!s) { res.innerHTML = ''; return; }
+    const hits = consultIndex().filter(i => i.ko.toLowerCase().includes(s) || i.en.toLowerCase().includes(s) || (i.syn && i.syn.includes(s)) || (i.id[0] === 'A' && (ANV.get(i.id.slice(2)) || []).some(c => c.includes(s))))
+      .sort((a, b) => (b.ko.toLowerCase().includes(s) || b.en.toLowerCase().includes(s)) - (a.ko.toLowerCase().includes(s) || a.en.toLowerCase().includes(s)));  /* 이름으로 맞은 것 먼저, 동의어로 맞은 것 뒤 */
+    res.innerHTML = hits.map(i => i.id[0] === 'A'
+      ? `<div class="chit"><div>${esc(i.ko)} <span class="muted" style="font-size:11px">검사</span></div><div>${(GO.get(i.id) || []).filter(e => e.p === 'indicates').map(e => `<button class="cadd" data-f="${esc(e.o)}" data-v="${e.pol === 'absent' ? 'absent' : 'present'}">${esc(e.q || '')} → ${esc(short(nlabel(e.o), 14))}${e.pol === 'absent' ? ' 없음' : ''}</button>`).join('')}</div></div>`
+      : `<div class="chit"><div>${esc(i.ko)} <span class="muted" style="font-size:11px">${esc(tko(i.id))}</span></div><div><button class="cadd" data-f="${esc(i.id)}" data-v="present">있음</button><button class="cadd" data-f="${esc(i.id)}" data-v="absent">없음</button></div></div>`).join('') || '<div class="muted" style="padding:6px">찾는 소견이 없습니다.</div>';
+  };
+  q.value = CS.q; show();
+  q.oninput = () => { CS.q = q.value; show(); };
+  const el = $('#consult');
+  el.onchange = e => {
+    if (e.target.id === 'cex') { const i = e.target.value; CS.items.clear(); CS.ex = i === '' ? null : +i; if (CS.ex != null) EXAMPLES[CS.ex].items.forEach(f => CS.items.set(f, 'present')); CS.open = 60; renderConsult(); return; }
+    const c = e.target.closest('input.ctog'); if (c) cSet(c.dataset.f, c.checked ? 'present' : 'absent');
+  };
+  el.onclick = e => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.classList.contains('cadd')) { cSet(b.dataset.f, b.dataset.v); }
+    else if (b.classList.contains('cdel')) cSet(b.dataset.f, null);
+    else if (b.classList.contains('cyes')) cSet(b.dataset.f, 'present');
+    else if (b.classList.contains('cno')) cSet(b.dataset.f, 'absent');
+    else if (b.id === 'creset') { CS.items.clear(); CS.q = ''; CS.ex = null; renderConsult(); }
+    else if (b.dataset.cd) { showTab('explore'); focusOn('D', b.dataset.cd.slice(2), true); }
+  };
+  const more = $('#cmore');
+  if (more && 'IntersectionObserver' in window) new IntersectionObserver((ents, ob) => { if (ents.some(en => en.isIntersecting)) { ob.disconnect(); CS.open += 60; const st = scrollY; renderConsult(); scrollTo(0, st); } }, {rootMargin: '400px'}).observe(more);
+}
+
+/* ── 시작 ── */
+header();
+document.documentElement.style.setProperty('--tabs-h', document.querySelector('.appbar .in').offsetHeight + 'px');  /* 왼쪽 목록·되돌아가기 줄을 앱 바 바로 아래에 고정 */
+openTable('disease');
+const start = (location.hash || '').slice(1);
+showTab(['explore', 'structure', 'tables', 'consult'].includes(start) ? start : 'explore');
+</script>

@@ -1,0 +1,18 @@
+{
+ "version": "kb-2026.10.08.2",
+ "format": 1,
+ "snapshot": "2026-10-08 01:22",
+ "public": true,
+ "excluded": [
+  "hpoa"
+ ],
+ "data_sha256": "34ad4b0586635b68",
+ "counts": {
+  "kcd_codes": 9626,
+  "disease_names": 2950,
+  "name_phenotype_links": 67709,
+  "kg_edges": 68018,
+  "findings": 292,
+  "mechanisms": 406
+ }
+}
