@@ -132,6 +132,13 @@ class KB:
             if m not in self.MONDO2KCD or r["method"] == "icd10_xref":
                 self.MONDO2KCD[m] = k
         self.HL, self.LOINC, self.ANKO = D.get("hpo_labels", {}), D.get("loinc", {}), D.get("analyte_ko", {})
+        # HPO 동의어(EXACT)와 부모 목록: 찾기는 동의어로도, 후보 순위는 하위 용어까지 맞게 센다 (화면 진료 탭과 같은 규칙)
+        self.HSYN, self.HPAR = D.get("hpo_syn", {}), D.get("hpo_tree", {})
+        self.HCH = defaultdict(list)
+        for c, ps in self.HPAR.items():
+            for p_ in ps:
+                self.HCH[p_].append(c)
+        self._desc = {}
         dm = D.get("dismech", {})
         self.DMm = {str(r[0]): {"mondo": r[1], "en": r[2], "ko": r[3], "stage": r[4], "depth": r[5], "go": r[6] or [], "gm": r[7] or []} for r in dm.get("mechs", [])}
         self.GOL, self.FN, self.GOKO = dm.get("go", {}), self.fill.get("nodes", {}), self.fill.get("go_ko", {})
@@ -213,6 +220,28 @@ class KB:
     def canon(self, k):
         """병명 키 → 그래프 노드 키 (코드 이름과 같은 병명은 그 코드)"""
         return self.ENT[k]["kcd"] if k in self.SAME else k
+
+    def hpo_of(self, node):
+        """노드 ID → HPO ID (F 노드는 소견 사전의 hpo_id)"""
+        return node[2:] if node.startswith("H|") else (self.FND.get(node[2:], {}).get("hpo_id") if node.startswith("F|") else None)
+
+    def descendants(self, node):
+        """노드와 그 하위 HPO 용어 노드들 (그래프에 있는 것만). '빈맥' → 동성 빈맥·심실 빈맥 …"""
+        if node in self._desc:
+            return self._desc[node]
+        out, h = {node}, self.hpo_of(node)
+        if h:
+            st, seen = [h], {h}
+            while st:
+                for c in self.HCH.get(st.pop(), []):
+                    if c not in seen:
+                        seen.add(c)
+                        st.append(c)
+                        n = "F|" + self.HPO2F[c] if c in self.HPO2F else "H|" + c
+                        if n in self.GI:
+                            out.add(n)
+        self._desc[node] = out
+        return out
 
     def nid(self, raw):
         """원본 ID(KCD:E14, MONDO:…, HP:…, SKKU:F:…, DM:…, HGNC:…, GO:…, CDM:…, LOINC:…) → 그래프 노드 ID"""
@@ -318,12 +347,16 @@ class KB:
             out.sort(key=lambda r: (r["code"].lower() != q.replace(".", "").lower(), not direct(r), -len(self.GO.get(r["id"], [])), r["code"]))  # 코드 일치 → 이름 일치 → 별칭
         elif kind == "finding":
             for f, r in self.FND.items():
-                if has(f, r["name_ko"], r.get("name_en"), r.get("hpo_id")):
-                    out.append({"id": "F|" + f, "name": r["name_ko"], "en": r.get("name_en"), "hpo": r.get("hpo_id")})
+                syn = self.HSYN.get(r.get("hpo_id") or "", [])
+                if has(f, r["name_ko"], r.get("name_en"), r.get("hpo_id")) or has(*syn):
+                    out.append({"id": "F|" + f, "name": r["name_ko"], "en": r.get("name_en"), "hpo": r.get("hpo_id"),
+                                **({} if has(f, r["name_ko"], r.get("name_en"), r.get("hpo_id")) else {"matched_synonym": next(z for z in syn if has(z))})})
             for h, lab in self.HL.items():
-                if h not in self.HPO2F and has(h, *lab):
-                    out.append({"id": "H|" + h, "name": lab[1] or lab[0], "en": lab[0], "hpo": h})
-            out.sort(key=lambda r: -len(self.GI.get(r["id"], [])))
+                syn = self.HSYN.get(h, [])
+                if h not in self.HPO2F and (has(h, *lab) or has(*syn)):
+                    out.append({"id": "H|" + h, "name": lab[1] or lab[0], "en": lab[0], "hpo": h,
+                                **({} if has(h, *lab) else {"matched_synonym": next(z for z in syn if has(z))})})
+            out.sort(key=lambda r: ("matched_synonym" in r, -len(self.GI.get(r["id"], []))))  # 이름으로 맞은 것 먼저
         elif kind == "mechanism":
             for m, r in self.MEC.items():
                 if has(m, r["name_ko"], r.get("name_en")):
@@ -373,7 +406,7 @@ class KB:
             if a != root and (a[0] in "FHTD" if direction > 0 else a[0] in "DE"):
                 continue
             for e in (self.GO if direction > 0 else self.GI).get(a, []):
-                if e["p"] not in CAUSAL or not self._ok(e, **flt) or (e.get("tgt") and root[0] == "D" and e["tgt"] != root[2:]):
+                if e["p"] not in CAUSAL or not self._ok(e, **flt) or e.get("pol") == "absent" or (e.get("tgt") and root[0] == "D" and e["tgt"] != root[2:]):
                     continue
                 b = e["o"] if direction > 0 else e["s"]
                 if b == root:
@@ -406,7 +439,7 @@ class KB:
             if a != root and a[0] in "FHTD":
                 continue
             for e in self.GO.get(a, []):
-                if e["p"] in CAUSAL and self._ok(e) and not (e.get("tgt") and e["tgt"] != root[2:]) and e["o"] not in nodes:
+                if e["p"] in CAUSAL and self._ok(e) and e.get("pol") != "absent" and not (e.get("tgt") and e["tgt"] != root[2:]) and e["o"] not in nodes:
                     nodes.add(e["o"])
                     st.append(e["o"])
         return nodes
@@ -424,15 +457,17 @@ class KB:
 
     def rank_diseases(self, present, absent=(), limit=20):
         """'있음' 소견을 많이 함께 가진 병명 순 (확률이 아니라 공통점). '없음' 소견이 그 병명 목록에 있으면 어긋남으로 센다.
+        넣은 소견의 하위 HPO 용어(예: 빈맥 → 동성 빈맥)를 가진 병도 맞음으로 센다.
         present·absent: HPO ID(HP:…) 또는 노드 ID(F|…·H|…)"""
-        P = {self._id(x) for x in present}
-        A = {self._id(x) for x in absent}
+        P = {self._id(x): self.descendants(self._id(x)) for x in present}  # 하위 용어(더 구체적인 소견)를 가진 병도 맞음
+        A = {self._id(x): self.descendants(self._id(x)) for x in absent}
         # 후보: 이름이 다른 병명 + 코드 자체(병명이 없거나, 코드와 같은 병명을 합친 코드). 코드는 그 코드 노드에서 닿는 소견만 센다
         cands = [k for k in self.ENT if k not in self.SAME] + [k for k in self.DIS if len(k) <= 4 and (not self.ENTS.get(k) or k in self.ENT_SAME) and self.GO.get("D|" + k)]
         out = []
         for k in cands:
             fs = self.findings_of("D|" + k) if "@" in k else {n for n in self._reach_ids("D|" + k) if n[0] in "FH"}
-            hit, miss = fs & P, fs & A
+            hit = {p for p, ds in P.items() if fs & ds}
+            miss = {a for a, ds in A.items() if fs & ds}
             if hit:
                 out.append({"id": "D|" + k, "name": self.node("D|" + k)["name"], "matched": len(hit), "conflicts": len(miss),
                             "matched_findings": [self.node(x)["name"] for x in hit], "conflicting": [self.node(x)["name"] for x in miss],

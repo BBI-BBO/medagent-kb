@@ -39,7 +39,7 @@ kb.rank_diseases(["HP:0000952", "HP:0001744"])    # 황달 + 비장비대를 함
 
 | 함수 | 하는 일 | 돌려주는 것 |
 |---|---|---|
-| `search(text, kind="disease", limit=20)` | 이름·코드로 찾기. kind: `disease` `finding` `mechanism` `test` | `[{id, name, en, …}]` — `id`를 다른 함수에 넘김 |
+| `search(text, kind="disease", limit=20)` | 이름·코드로 찾기 (소견은 HPO 동의어로도, 예: "racing heart" → 빈맥). kind: `disease` `finding` `mechanism` `test` | `[{id, name, en, …}]` — `id`를 다른 함수에 넘김 |
 | `disease(code)` | KCD 코드(`E14`·`E83.0`)나 병명 키(`E830@MONDO:…`) | 이름·장·상위·하위 코드·포함 용어·**병명 목록**·주호소 스키마 |
 | `phenotypes(name_key)` | 병명의 HPO 표현형 | `[{id, name, en, freq, freq_by_source, sources, diagnostic, from_subtype}]` |
 | `edges(node, direction="out"/"in")` | 한 노드의 나가는(원인으로서)·들어오는(결과로서) 연결 | `[{from, relation, to, source, qualifier, …}]` |
@@ -47,7 +47,7 @@ kb.rank_diseases(["HP:0000952", "HP:0001744"])    # 황달 + 비장비대를 함
 | `findings_of(disease)` | 질병에서 기전을 거쳐 닿는 소견 (화면 목록의 '소견 N') | 노드 ID 집합 |
 | `causes_of(finding)` | 소견을 일으킬 수 있는 질병·노출 (감별 후보) | `[{id, name, …}]` |
 | `tests_for(finding)` | 소견을 판정하는 검사 (LOINC2HPO) | `[{from(검사), qualifier(결과 H·L·POS…), …}]` |
-| `rank_diseases(present, absent=())` | '있음' 소견을 많이 함께 가진 병명 순, '없음'과 어긋나는 수 | `[{id, name, matched, conflicts, …}]` — **확률이 아니라 공통점** |
+| `rank_diseases(present, absent=())` | '있음' 소견을 많이 함께 가진 병명 순, '없음'과 어긋나는 수. 하위 HPO 용어(빈맥 → 동성 빈맥)를 가진 병도 맞음으로 셈 | `[{id, name, matched, conflicts, …}]` — **확률이 아니라 공통점** |
 | `table(name)` · `tables()` | DB 표를 dict 로 | 큰 표는 미리보기 300행만 (`total`이 실제 행 수) |
 | `node(id)` | 노드 이름·영어·종류 | `{id, name, en, kind}` |
 
@@ -76,6 +76,7 @@ OpenAI 호환 API 는 `{"type": "function", "function": {"name": t["name"], "des
 에이전트에게 함께 알려 줄 것:
 - 노드 ID는 `종류|값`입니다 (4절). `search`로 찾은 `id`를 그대로 넘기게 하세요.
 - `rank_diseases`는 겹치는 소견 수일 뿐 진단 확률이 아닙니다.
+- `source`가 `statpearls_ai`·`medlineplus_ai`인 연결은 StatPearls·MedlinePlus 원문을 AI가 인용과 함께 뽑고 다른 모델이 검토한 것입니다 (검수 전).
 - `ai_or_auto`가 붙은 연결(AI 기전 초안·유전자 자동 연결)과 `name_src: "AI 번역"` · `method: "ai_place"`인 병명은 **의학과 검수 전**입니다.
 
 ## 3. 버전 관리
