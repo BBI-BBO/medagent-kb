@@ -25,6 +25,7 @@ import re
 import sys
 import urllib.request
 from collections import defaultdict
+from pathlib import Path
 
 BASE = "https://bbi-bbo.github.io/medagent-kb/"
 RELEASE = "https://github.com/BBI-BBO/medagent-kb/releases/download/{v}/"
@@ -49,16 +50,16 @@ def _get(url):
 def _load(name, base, cache):
     """공개판 파일 하나를 읽어 JSON 으로. base 가 폴더 경로면 그 폴더에서, 주소면 받아서 cache 에 둔다."""
     if not base.startswith("http"):
-        s = open(os.path.join(base, name), encoding="utf-8").read()
+        s = Path(base, name).read_text(encoding="utf-8")
     else:
         path = os.path.join(cache, name) if cache else None
         if path and os.path.exists(path):
-            s = open(path, encoding="utf-8").read()
+            s = Path(path).read_text(encoding="utf-8")
         else:
             s = _get(base + name)
             if path:
                 os.makedirs(cache, exist_ok=True)
-                open(path, "w", encoding="utf-8").write(s)
+                Path(path).write_text(s, encoding="utf-8")
     head = HEAD[name]
     if not s.startswith(head):
         raise ValueError(f"{name}: 형식이 다릅니다 ({s[:40]!r})")
@@ -216,6 +217,46 @@ class KB:
             add(self.nid(s), p, self.nid(o), src=src, q=q, conf=conf, basis=basis or (q if src == "orphanet_go" else ""),
                 depth=depth or 0, fill="B" if src == "claude_mech" else "A", tgt=tgt and self.canon(tgt), review=vd)
         self._fc = {}
+
+    @staticmethod
+    def _schema_refs(edge):
+        """성균관의대 간선이 어느 주호소 스키마에서 나온 것인지."""
+        if edge.get("src") not in {"skku_lrc_pbl", "cpx_core_2026"} or not edge.get("ref"):
+            return frozenset()
+        return frozenset(x.strip() for x in edge["ref"].split(" · ") if x.strip())
+
+    def _walk(self, root, direction=1, schema_scoped=True, **flt):
+        """공유 기전에서 다른 주호소 스키마로 넘어가지 않도록 인과 그래프를 걷는다."""
+        nodes, edges, edge_ids = {root}, [], set()
+        states, stack = {(root, None)}, [(root, None)]
+        while stack:
+            current, context = stack.pop()
+            if current != root and (current[0] in "FHTD" if direction > 0 else current[0] in "DE"):
+                continue
+            graph = self.GO if direction > 0 else self.GI
+            for edge in graph.get(current, []):
+                if edge["p"] not in CAUSAL or not self._ok(edge, **flt) or edge.get("pol") == "absent":
+                    continue
+                if edge.get("tgt") and root[0] == "D" and edge["tgt"] != root[2:]:
+                    continue
+                next_context = context
+                refs = self._schema_refs(edge)
+                if schema_scoped and refs:
+                    next_context = refs if context is None else context & refs
+                    if not next_context:
+                        continue
+                target = edge["o"] if direction > 0 else edge["s"]
+                if target == root:
+                    continue
+                if id(edge) not in edge_ids:
+                    edge_ids.add(id(edge))
+                    edges.append(edge)
+                nodes.add(target)
+                state = (target, next_context)
+                if state not in states:
+                    states.add(state)
+                    stack.append(state)
+        return nodes, edges
 
     def canon(self, k):
         """병명 키 → 그래프 노드 키 (코드 이름과 같은 병명은 그 코드)"""
@@ -382,6 +423,49 @@ class KB:
                 "same_as_code": [{x: self.ENT[e][x] for x in ("ko", "en", "mondo", "name_src", "method")} for e in self.ENT_SAME.get(k, [])],  # 코드와 같은 병명 (그래프에서는 코드 노드)
                 "schemas": sorted(self.SKREF.get(i, set()) | self.SKREF.get("D|" + k, set()))}
 
+    def presentation(self, presentation_id):
+        """성대 주호소와 정규화된 구성 증상·수식어. 옛 판에는 구성요소가 빈 목록이다."""
+        row = next((r for r in self.table("presentation") if r["id"] == presentation_id), None)
+        if row is None:
+            raise KeyError(f"없는 주호소: {presentation_id}")
+        components = []
+        if "presentation_component" in self.D["tables"]:
+            components = [
+                r for r in self.table("presentation_component")
+                if r["presentation_id"] == presentation_id
+            ]
+            components.sort(key=lambda r: r["ordinal"])
+        return {**row, "components": components}
+
+    def exam_actions_for(self, finding):
+        """한 소견을 확인할 수 있는 표준 진찰 행동. 검사 결과를 미리 단정하지 않는다."""
+        if not {"exam_action", "exam_action_finding"} <= self.D["tables"].keys():
+            return []
+        node = self._id(finding)
+        actions = {r["id"]: r for r in self.table("exam_action")}
+        links = [r for r in self.table("exam_action_finding") if r["node_id"] == node]
+        return [
+            {**actions[r["action_id"]], "finding": self.node(node), "interpretation": r["interpretation"]}
+            for r in links if r["action_id"] in actions
+        ]
+
+    def exams_for_disease(self, disease, limit=30, schema_scoped=True):
+        """질환에 연결된 소견을 실제로 확인할 표준 진찰 행동. 정답이 아니라 확인 후보이다."""
+        if not {"exam_action", "exam_action_finding"} <= self.D["tables"].keys():
+            return []
+        findings = self.findings_of(disease, schema_scoped=schema_scoped)
+        actions = {r["id"]: r for r in self.table("exam_action")}
+        grouped = defaultdict(list)
+        for link in self.table("exam_action_finding"):
+            if link["node_id"] in findings and link["action_id"] in actions:
+                grouped[link["action_id"]].append({
+                    "finding": self.node(link["node_id"]),
+                    "interpretation": link["interpretation"],
+                })
+        out = [{**actions[action_id], "checks": checks} for action_id, checks in grouped.items()]
+        out.sort(key=lambda r: (r["priority"], r["system"], r["id"]))
+        return out[:limit]
+
     def phenotypes(self, name_key, sub=True):
         """병명(코드@MONDO)의 HPO 표현형: 출처별 빈도(0~1), 진단적 여부, 하위 질병에서 왔는지(depth>0). 빈도 높은 순"""
         d = self._id(name_key)
@@ -396,57 +480,38 @@ class KB:
         es = (self.GO if direction == "out" else self.GI).get(i, [])
         return [self._edge(e) for e in es if self._ok(e, **flt)]
 
-    def reach(self, node, direction=1, **flt):
-        """화면 그래프와 같은 인과 트리. direction=1: 결과 쪽(기전 사슬 → 소견), -1: 원인 쪽(기전 ← 질병·노출).
-        소견·검사·다른 질병에서는 더 가지 않는다(정방향), 역방향은 질병·노출에서 멈춘다."""
+    def reach(self, node, direction=1, schema_scoped=True, **flt):
+        """화면 그래프와 같은 인과 트리.
+
+        direction=1은 결과 쪽, -1은 원인 쪽이다. ``schema_scoped=True``(기본)는
+        정규화된 공유 기전을 따라 다른 주호소 스키마의 소견이 섞이는 것을 막는다.
+        """
         root = self._id(node)
-        nodes, edges, st = {root}, [], [root]
-        while st:
-            a = st.pop()
-            if a != root and (a[0] in "FHTD" if direction > 0 else a[0] in "DE"):
-                continue
-            for e in (self.GO if direction > 0 else self.GI).get(a, []):
-                if e["p"] not in CAUSAL or not self._ok(e, **flt) or e.get("pol") == "absent" or (e.get("tgt") and root[0] == "D" and e["tgt"] != root[2:]):
-                    continue
-                b = e["o"] if direction > 0 else e["s"]
-                if b == root:
-                    continue
-                edges.append(e)
-                if b not in nodes:
-                    nodes.add(b)
-                    st.append(b)
+        nodes, edges = self._walk(root, direction, schema_scoped=schema_scoped, **flt)
         return {"root": self.node(root), "nodes": [self.node(n) for n in nodes if n != root], "edges": [self._edge(e) for e in edges]}
 
-    def findings_of(self, disease):
+    def findings_of(self, disease, schema_scoped=True):
         """질병(코드·병명)에서 기전을 거쳐 닿는 소견 ID 집합 (화면 목록의 '소견 N'과 같은 수)"""
         i = self._id(disease)
         k = i[2:]
-        if k in self._fc:
-            return self._fc[k]
+        cache_key = (k, schema_scoped)
+        if cache_key in self._fc:
+            return self._fc[cache_key]
         ids = [k] if "@" in k else [k] + self.ENTS.get(k, [])
         out = set()
         for z in ids:
-            for n in self._reach_ids("D|" + z):
+            for n in self._reach_ids("D|" + z, schema_scoped=schema_scoped):
                 if n[0] in "FH":
                     out.add(n)
-        self._fc[k] = out
+        self._fc[cache_key] = out
         return out
 
-    def _reach_ids(self, root):
-        nodes, st = {root}, [root]
-        while st:
-            a = st.pop()
-            if a != root and a[0] in "FHTD":
-                continue
-            for e in self.GO.get(a, []):
-                if e["p"] in CAUSAL and self._ok(e) and e.get("pol") != "absent" and not (e.get("tgt") and e["tgt"] != root[2:]) and e["o"] not in nodes:
-                    nodes.add(e["o"])
-                    st.append(e["o"])
-        return nodes
+    def _reach_ids(self, root, schema_scoped=True):
+        return self._walk(root, 1, schema_scoped=schema_scoped)[0]
 
-    def causes_of(self, finding, limit=50):
+    def causes_of(self, finding, limit=50, schema_scoped=True):
         """소견을 일으킬 수 있는 질병·노출 (원인 쪽 트리의 잎). 감별 후보 목록"""
-        t = self.reach(finding, -1)
+        t = self.reach(finding, -1, schema_scoped=schema_scoped)
         leaves = [n for n in t["nodes"] if n["id"][0] in "DE"]
         return leaves[:limit]
 
@@ -465,7 +530,7 @@ class KB:
         cands = [k for k in self.ENT if k not in self.SAME] + [k for k in self.DIS if len(k) <= 4 and (not self.ENTS.get(k) or k in self.ENT_SAME) and self.GO.get("D|" + k)]
         out = []
         for k in cands:
-            fs = self.findings_of("D|" + k) if "@" in k else {n for n in self._reach_ids("D|" + k) if n[0] in "FH"}
+            fs = self.findings_of("D|" + k) if "@" in k else {n for n in self._reach_ids("D|" + k, schema_scoped=True) if n[0] in "FH"}
             hit = {p for p, ds in P.items() if fs & ds}
             miss = {a for a, ds in A.items() if fs & ds}
             if hit:
@@ -491,6 +556,10 @@ class KB:
                                                            "limit": {"type": "integer"}}, "required": ["present"]}},
         {"name": "tests_for", "description": "소견을 판정하는 검사(LOINC 묶음)와 결과값",
          "input_schema": {"type": "object", "properties": {"finding": {"type": "string"}}, "required": ["finding"]}},
+        {"name": "presentation", "description": "성대 주호소를 독립 증상과 발병시점·부위 수식어로 분해한 정규화 구성요소",
+         "input_schema": {"type": "object", "properties": {"presentation_id": {"type": "string"}}, "required": ["presentation_id"]}},
+        {"name": "exams_for_disease", "description": "질환에 연결된 소견을 확인하는 표준 진찰 행동 후보. 결과를 미리 단정하지 않음",
+         "input_schema": {"type": "object", "properties": {"disease": {"type": "string"}, "limit": {"type": "integer"}}, "required": ["disease"]}},
     ]
 
     def call(self, name, args):

@@ -1,0 +1,300 @@
+{
+  "version": "kb-2026.10.13.1",
+  "base_version": "kb-2026.10.08.2",
+  "source": {
+    "code": "cpx_core_2026",
+    "title": "CPX 핵심 연결 보강 (교과서 근거·팀 정규화)",
+    "url": "https://www.ncbi.nlm.nih.gov/books/NBK201/",
+    "version_date": "2026-10-13",
+    "license": "팀 작성 사실 요약·정규화; 링크된 원문 조건 준수",
+    "rights": "allow",
+    "note": "NOVA 증례 정답을 보지 않고 성대 주호소 전반에 적용한 규칙 기반 보강. 원문을 복제하지 않고 사실을 요약했으며 의학과 검수 전."
+  },
+  "presentation_overrides": {
+    "abdominal_distension": [
+      {"expression_ko": "복부팽만", "node_id": "F|abdominal_distension", "semantic_role": "core", "body_site": "abdomen"}
+    ],
+    "chest_pain": [
+      {"expression_ko": "가슴통증", "node_id": "F|chest_pain", "semantic_role": "core", "body_site": "chest"}
+    ],
+    "dysmenorrhea": [
+      {"expression_ko": "월경통", "node_id": "F|dysmenorrhea", "semantic_role": "coequal", "body_site": "pelvis", "context": "menstruation"},
+      {"expression_ko": "골반통", "node_id": "F|pelvic_pain", "semantic_role": "coequal", "body_site": "pelvis"}
+    ],
+    "dysuria": [
+      {"expression_ko": "배뇨통", "node_id": "F|dysuria", "semantic_role": "core", "body_site": "lower_urinary_tract", "context": "urination"}
+    ],
+    "hemoptysis": [
+      {"expression_ko": "객혈", "node_id": "F|hemoptysis", "semantic_role": "core", "body_site": "respiratory_tract"}
+    ],
+    "joint_pain_swelling": [
+      {"expression_ko": "관절통", "node_id": "F|arthralgia", "semantic_role": "coequal", "body_site": "joint"},
+      {"expression_ko": "관절부기", "node_id": "F|joint_swelling", "semantic_role": "coequal", "body_site": "joint"}
+    ],
+    "limb_pain": [
+      {"expression_ko": "상하지 통증", "node_id": "F|limb_pain", "semantic_role": "core", "body_site": "upper_and_lower_limbs"}
+    ],
+    "limb_weakness": [
+      {"expression_ko": "팔다리 근력약화", "node_id": "F|limb_weakness", "semantic_role": "core", "body_site": "upper_and_lower_limbs"}
+    ],
+    "low_back_pain": [
+      {"expression_ko": "허리통증", "node_id": "F|low_back_pain", "semantic_role": "core", "body_site": "lumbar_region"}
+    ],
+    "neck_mass": [
+      {"expression_ko": "목덩이", "node_id": "F|neck_mass", "semantic_role": "core", "body_site": "neck"}
+    ],
+    "oliguria": [
+      {"expression_ko": "무뇨", "node_id": "F|anuria", "semantic_role": "coequal"},
+      {"expression_ko": "핍뇨", "node_id": "F|oliguria", "semantic_role": "coequal"}
+    ],
+    "shock": [
+      {"expression_ko": "저혈압", "node_id": "F|hypotension", "semantic_role": "coequal"},
+      {"expression_ko": "쇼크", "node_id": "F|shock", "semantic_role": "coequal"}
+    ],
+    "short_stature": [
+      {"expression_ko": "성장지연", "node_id": "F|short_stature", "semantic_role": "coequal", "context": "linear_growth"},
+      {"expression_ko": "사춘기 발달 지연", "node_id": "F|delayed_puberty", "semantic_role": "coequal", "context": "pubertal_development"}
+    ],
+    "vomiting": [
+      {"expression_ko": "구역", "node_id": "F|nausea", "semantic_role": "coequal"},
+      {"expression_ko": "구토", "node_id": "F|vomiting", "semantic_role": "coequal"}
+    ],
+    "dyspnea_acute": [
+      {"expression_ko": "호흡곤란", "node_id": "F|dyspnea", "semantic_role": "core", "onset": "acute"}
+    ],
+    "dyspnea_chronic": [
+      {"expression_ko": "호흡곤란", "node_id": "F|dyspnea", "semantic_role": "core", "onset": "chronic"}
+    ],
+    "paresthesia": [
+      {"expression_ko": "손발저림", "node_id": "F|paresthesia", "semantic_role": "core", "body_site": "hands_and_feet"}
+    ],
+    "prenatal_care": [
+      {"expression_ko": "산전관리", "normalized_ko": "산전 진료 맥락", "node_id": null, "concept_kind": "care_context", "semantic_role": "care_context", "context": "pregnancy_prenatal_care"}
+    ],
+    "preterm_infant": [
+      {"expression_ko": "미숙아", "node_id": "F|premature_birth", "concept_kind": "developmental_state", "semantic_role": "core", "context": "neonatal"}
+    ]
+  },
+  "normalization_rules": [
+    ["split_observable_conjunction", "서로 독립해 확인할 수 있는 증상·징후의 병렬 표현은 각각의 표준 노드로 분해", "구역·구토 → nausea + vomiting"],
+    ["retain_legacy_presentation", "기존 presentation.id와 대표 finding_id는 호환성을 위해 유지하고 세부 의미는 presentation_component에 추가", "joint_pain_swelling은 유지"],
+    ["qualifier_not_concept", "급성·만성, 부위, 중증도, 좌우, 상황 맥락은 별도 질환·소견 노드가 아니라 수식어로 저장", "호흡곤란(급성) → dyspnea + onset=acute"],
+    ["normalize_surface_and_concept", "성대 원문 조각과 정규 표준 라벨·개념 종류를 나란히 저장", "가슴통증 → expression=가슴통증, normalized=가슴 통증, kind=symptom"],
+    ["synonym_not_duplicate", "괄호 속 동의어나 번역 변형은 새 개념을 만들지 않고 같은 표준 노드에 연결", "손발저림 → paresthesia + body_site"],
+    ["do_not_split_fixed_expression", "비율·검사 묶음·고정 임상 표현은 의미가 훼손되므로 기계적으로 분해하지 않음", "BUN/Cr, PT/INR, CT/MRI"],
+    ["preserve_provenance", "원문 표현·주호소 ID·출처를 유지하고 정규화 결과와 분리", "원문은 presentation.name_ko에 보존"]
+  ],
+  "mechanisms": [
+    ["atherosclerotic_plaque_disruption", "죽상경화판 파열·미란", "Atherosclerotic plaque disruption", null],
+    ["coronary_thrombotic_occlusion", "관상동맥 혈전성 폐색", "Coronary thrombotic occlusion", "thromboembolic_occlusion"],
+    ["cardiomyocyte_necrosis", "심근세포 괴사", "Cardiomyocyte necrosis", null],
+    ["spinal_cord_inflammation", "척수 염증", "Spinal cord inflammation", "inflammation"],
+    ["thiamine_dependent_energy_failure", "티아민 의존성 뇌 에너지 대사 장애", "Failure of thiamine-dependent cerebral energy metabolism", "energy_production_down"],
+    ["alveolar_interstitial_injury", "폐포·간질 반복 손상", "Recurrent alveolar-interstitial injury", null],
+    ["pulmonary_interstitial_fibrosis", "폐간질 섬유화", "Pulmonary interstitial fibrosis", null],
+    ["av_conduction_failure", "방실 전도 장애", "Atrioventricular conduction failure", null],
+    ["peripheral_nerve_inflammation", "말초신경 면역성 염증", "Immune-mediated peripheral nerve inflammation", "inflammation"],
+    ["peripheral_demyelination", "말초신경 분절성 탈수초", "Segmental peripheral demyelination", "demyelination"],
+    ["orexin_deficiency", "시상하부 오렉신(히포크레틴) 결핍", "Hypothalamic orexin (hypocretin) deficiency", null],
+    ["sleep_wake_instability", "수면-각성 상태 불안정", "Sleep-wake state instability", null],
+    ["tubulointerstitial_inflammation", "신세뇨관·간질 염증과 부종", "Tubulointerstitial inflammation and edema", "inflammation"],
+    ["myocardial_inflammation", "심근 염증", "Myocardial inflammation", "inflammation"],
+    ["cardiomyocyte_injury", "심근세포 손상", "Cardiomyocyte injury", null],
+    ["thyroid_follicular_autonomy", "갑상선 결절의 자율적 호르몬 생성", "Autonomous thyroid follicular hormone production", null],
+    ["autoimmune_thyrocyte_destruction", "자가면역성 갑상선 여포세포 파괴", "Autoimmune destruction of thyroid follicular cells", "immune_dysregulation"],
+    ["intrathoracic_visceral_herniation", "복강 장기의 흉강 내 탈출", "Herniation of abdominal viscera into the thorax", null],
+    ["sars_cov2_tissue_injury", "SARS-CoV-2 감염에 의한 조직 손상", "SARS-CoV-2-associated tissue injury", null],
+    ["hbv_immune_liver_injury", "B형간염바이러스 연관 면역성 간손상", "HBV-associated immune-mediated liver injury", null]
+  ],
+  "kg": [
+    ["KCD:I21", "causes", "SKKU:M:atherosclerotic_plaque_disruption", "cpx_core_2026", "교과서 근거 보강·의학과 검수 전", null, "가슴통증 스키마 · 실신 스키마 · 저혈압·쇼크 스키마", "cpxev:mi"],
+    ["SKKU:M:atherosclerotic_plaque_disruption", "causes", "SKKU:M:coronary_thrombotic_occlusion", "cpx_core_2026", null, null, "가슴통증 스키마 · 실신 스키마 · 저혈압·쇼크 스키마", "cpxev:mi"],
+    ["SKKU:M:coronary_thrombotic_occlusion", "causes", "SKKU:M:myocardial_o2_supply_down", "cpx_core_2026", null, null, "가슴통증 스키마 · 실신 스키마 · 저혈압·쇼크 스키마", "cpxev:mi"],
+    ["SKKU:M:myocardial_o2_supply_down", "causes", "SKKU:M:myocardial_ischemia", "cpx_core_2026", null, null, "가슴통증 스키마 · 실신 스키마 · 저혈압·쇼크 스키마", "cpxev:mi"],
+    ["SKKU:M:myocardial_ischemia", "causes", "SKKU:M:cardiomyocyte_necrosis", "cpx_core_2026", null, null, "가슴통증 스키마 · 실신 스키마 · 저혈압·쇼크 스키마", "cpxev:mi"],
+    ["SKKU:M:cardiomyocyte_necrosis", "causes", "SKKU:M:cardiac_output_down", "cpx_core_2026", null, null, "실신 스키마 · 저혈압·쇼크 스키마", "cpxev:mi"],
+
+    ["KCD:G373", "causes", "SKKU:M:spinal_cord_inflammation", "cpx_core_2026", "코드 수준 연결·의학과 검수 전", null, "손발저림 스키마 · 운동실조 스키마 · 팔다리 근력약화 스키마", "cpxev:transverse_myelitis"],
+    ["SKKU:M:spinal_cord_inflammation", "causes", "SKKU:M:cns_demyelination", "cpx_core_2026", null, null, "손발저림 스키마 · 운동실조 스키마 · 팔다리 근력약화 스키마", "cpxev:transverse_myelitis"],
+    ["SKKU:M:cns_demyelination", "causes", "SKKU:M:axonal_injury", "cpx_core_2026", null, null, "손발저림 스키마 · 운동실조 스키마 · 팔다리 근력약화 스키마", "cpxev:transverse_myelitis"],
+    ["SKKU:M:cns_demyelination", "manifests_as", "SKKU:F:limb_weakness", "cpx_core_2026", null, null, "팔다리 근력약화 스키마", "cpxev:transverse_myelitis"],
+    ["SKKU:M:spinal_cord_inflammation", "manifests_as", "HP:0001347", "cpx_core_2026", "진찰로 확인", null, "팔다리 근력약화 스키마", "cpxev:transverse_myelitis"],
+
+    ["KCD:E512", "causes", "SKKU:M:thiamine_deficiency", "cpx_core_2026", null, null, "기억력 저하 스키마 · 운동실조 스키마 · 의식변화 스키마", "cpxev:wernicke"],
+    ["SKKU:M:thiamine_deficiency", "causes", "SKKU:M:thiamine_dependent_energy_failure", "cpx_core_2026", null, null, "기억력 저하 스키마 · 운동실조 스키마 · 의식변화 스키마", "cpxev:wernicke"],
+    ["SKKU:M:thiamine_dependent_energy_failure", "manifests_as", "SKKU:F:altered_consciousness", "cpx_core_2026", null, null, "의식변화 스키마", "cpxev:wernicke"],
+    ["SKKU:M:thiamine_dependent_energy_failure", "manifests_as", "SKKU:F:ataxia", "cpx_core_2026", null, null, "운동실조 스키마", "cpxev:wernicke"],
+    ["SKKU:M:thiamine_dependent_energy_failure", "manifests_as", "HP:0000639", "cpx_core_2026", "진찰로 확인", null, "운동실조 스키마", "cpxev:wernicke"],
+
+    ["KCD:J848", "causes", "SKKU:M:alveolar_interstitial_injury", "cpx_core_2026", null, null, "호흡곤란(급성) 스키마 · 호흡곤란(만성) 스키마", "cpxev:ild"],
+    ["SKKU:M:alveolar_interstitial_injury", "causes", "SKKU:M:pulmonary_interstitial_fibrosis", "cpx_core_2026", null, null, "호흡곤란(급성) 스키마 · 호흡곤란(만성) 스키마", "cpxev:ild"],
+    ["SKKU:M:pulmonary_interstitial_fibrosis", "causes", "SKKU:M:diffusion_impairment", "cpx_core_2026", null, null, "호흡곤란(급성) 스키마 · 호흡곤란(만성) 스키마", "cpxev:ild"],
+    ["SKKU:M:pulmonary_interstitial_fibrosis", "manifests_as", "SKKU:F:rales", "cpx_core_2026", "청진으로 확인", null, "호흡곤란(만성) 스키마", "cpxev:ild"],
+
+    ["KCD:I455", "causes", "SKKU:M:av_conduction_failure", "cpx_core_2026", null, null, "실신 스키마", "cpxev:av_block"],
+    ["SKKU:M:av_conduction_failure", "manifests_as", "SKKU:F:bradycardia", "cpx_core_2026", "맥박·심전도로 확인", null, "실신 스키마", "cpxev:av_block"],
+    ["SKKU:M:av_conduction_failure", "causes", "SKKU:M:cardiac_output_down", "cpx_core_2026", null, null, "실신 스키마", "cpxev:av_block"],
+    ["SKKU:M:cardiac_output_down", "causes", "SKKU:M:systemic_bp_down", "cpx_core_2026", null, null, "실신 스키마 · 저혈압·쇼크 스키마", "cpxev:av_block"],
+    ["SKKU:M:systemic_bp_down", "manifests_as", "SKKU:F:hypotension", "cpx_core_2026", "활력징후로 확인", null, "저혈압·쇼크 스키마", "cpxev:av_block"],
+
+    ["KCD:K658", "causes", "SKKU:M:peritoneal_inflammation", "cpx_core_2026", null, null, "구역·구토 스키마 · 월경통·골반통 스키마", "cpxev:peritonitis"],
+    ["SKKU:M:peritoneal_inflammation", "manifests_as", "SKKU:F:abdominal_pain", "cpx_core_2026", null, null, "구역·구토 스키마 · 월경통·골반통 스키마", "cpxev:peritonitis"],
+    ["SKKU:M:peritoneal_inflammation", "manifests_as", "HP:0032546", "cpx_core_2026", "복부 촉진으로 확인", null, "구역·구토 스키마 · 월경통·골반통 스키마", "cpxev:peritonitis"],
+    ["SKKU:M:peritoneal_inflammation", "manifests_as", "HP:0032545", "cpx_core_2026", "복부 관찰·촉진으로 확인", null, "구역·구토 스키마 · 월경통·골반통 스키마", "cpxev:peritonitis"],
+
+    ["KCD:G618", "causes", "SKKU:M:peripheral_nerve_inflammation", "cpx_core_2026", null, null, "손발저림 스키마 · 팔다리 근력약화 스키마", "cpxev:cidp"],
+    ["SKKU:M:peripheral_nerve_inflammation", "causes", "SKKU:M:peripheral_demyelination", "cpx_core_2026", null, null, "손발저림 스키마 · 팔다리 근력약화 스키마", "cpxev:cidp"],
+    ["SKKU:M:peripheral_demyelination", "causes", "SKKU:M:axonal_injury", "cpx_core_2026", null, null, "손발저림 스키마 · 팔다리 근력약화 스키마", "cpxev:cidp"],
+    ["SKKU:M:peripheral_demyelination", "manifests_as", "SKKU:F:limb_weakness", "cpx_core_2026", null, null, "팔다리 근력약화 스키마", "cpxev:cidp"],
+    ["SKKU:M:peripheral_demyelination", "manifests_as", "HP:0001265", "cpx_core_2026", "심부건반사로 확인", null, "팔다리 근력약화 스키마", "cpxev:cidp"],
+
+    ["KCD:G474", "causes", "SKKU:M:orexin_deficiency", "cpx_core_2026", "제1형 발작수면에서 대표적·아형 주의", null, "수면장애 스키마", "cpxev:narcolepsy"],
+    ["SKKU:M:orexin_deficiency", "causes", "SKKU:M:sleep_wake_instability", "cpx_core_2026", null, null, "수면장애 스키마", "cpxev:narcolepsy"],
+    ["SKKU:M:sleep_wake_instability", "manifests_as", "SKKU:F:sleep_disturbance", "cpx_core_2026", null, null, "수면장애 스키마", "cpxev:narcolepsy"],
+    ["SKKU:M:sleep_wake_instability", "manifests_as", "HP:0002524", "cpx_core_2026", "아형에 따라 탈력발작", null, "수면장애 스키마", "cpxev:narcolepsy"],
+
+    ["KCD:N12", "causes", "SKKU:M:tubulointerstitial_inflammation", "cpx_core_2026", null, null, "무뇨·핍뇨 스키마", "cpxev:tin"],
+    ["SKKU:M:tubulointerstitial_inflammation", "causes", "SKKU:M:gfr_down", "cpx_core_2026", null, null, "무뇨·핍뇨 스키마", "cpxev:tin"],
+    ["SKKU:M:gfr_down", "manifests_as", "SKKU:F:oliguria", "cpx_core_2026", null, null, "무뇨·핍뇨 스키마", "cpxev:tin"],
+
+    ["KCD:I40", "causes", "SKKU:M:myocardial_inflammation", "cpx_core_2026", null, null, "가슴통증 스키마 · 저혈압·쇼크 스키마", "cpxev:myocarditis"],
+    ["SKKU:M:myocardial_inflammation", "causes", "SKKU:M:cardiomyocyte_injury", "cpx_core_2026", null, null, "가슴통증 스키마 · 저혈압·쇼크 스키마", "cpxev:myocarditis"],
+    ["SKKU:M:cardiomyocyte_injury", "causes", "SKKU:M:cardiac_output_down", "cpx_core_2026", null, null, "저혈압·쇼크 스키마", "cpxev:myocarditis"],
+    ["SKKU:M:myocardial_inflammation", "manifests_as", "SKKU:F:chest_pain", "cpx_core_2026", null, null, "가슴통증 스키마", "cpxev:myocarditis"],
+
+    ["KCD:E051", "causes", "SKKU:M:thyroid_follicular_autonomy", "cpx_core_2026", null, null, "목덩이 스키마 · 체중 감소 스키마", "cpxev:toxic_nodule"],
+    ["KCD:E052", "causes", "SKKU:M:thyroid_follicular_autonomy", "cpx_core_2026", null, null, "목덩이 스키마 · 체중 감소 스키마", "cpxev:toxic_nodule"],
+    ["SKKU:M:thyroid_follicular_autonomy", "causes", "SKKU:M:thyroid_hormone_up", "cpx_core_2026", null, null, "체중 감소 스키마", "cpxev:toxic_nodule"],
+    ["SKKU:M:thyroid_follicular_autonomy", "manifests_as", "SKKU:F:thyroid_nodule", "cpx_core_2026", "갑상선 촉진으로 확인", null, "목덩이 스키마", "cpxev:toxic_nodule"],
+    ["SKKU:M:thyroid_hormone_up", "causes", "SKKU:M:metabolic_rate_up", "cpx_core_2026", null, null, "체중 감소 스키마", "cpxev:toxic_nodule"],
+
+    ["KCD:E065", "causes", "SKKU:M:autoimmune_thyrocyte_destruction", "cpx_core_2026", "만성 자가면역 갑상선염 중심·아형 주의", null, "목덩이 스키마 · 체중 증가 스키마", "cpxev:chronic_thyroiditis"],
+    ["SKKU:M:autoimmune_thyrocyte_destruction", "causes", "SKKU:M:thyroid_hormone_synthesis_impaired", "cpx_core_2026", null, null, "목덩이 스키마 · 체중 증가 스키마", "cpxev:chronic_thyroiditis"],
+    ["SKKU:M:thyroid_hormone_synthesis_impaired", "causes", "SKKU:M:thyroid_hormone_deficiency", "cpx_core_2026", null, null, "체중 증가 스키마", "cpxev:chronic_thyroiditis"],
+    ["SKKU:M:thyroid_hormone_deficiency", "causes", "SKKU:M:metabolic_rate_down", "cpx_core_2026", null, null, "체중 증가 스키마", "cpxev:chronic_thyroiditis"],
+    ["SKKU:M:metabolic_rate_down", "manifests_as", "SKKU:F:weight_gain", "cpx_core_2026", null, null, "체중 증가 스키마", "cpxev:chronic_thyroiditis"],
+
+    ["KCD:K44", "causes", "SKKU:M:intrathoracic_visceral_herniation", "cpx_core_2026", null, null, "미숙아 스키마 · 호흡곤란(급성) 스키마 · 호흡곤란(만성) 스키마", "cpxev:diaphragmatic_hernia"],
+    ["SKKU:M:intrathoracic_visceral_herniation", "causes", "SKKU:M:lung_compression", "cpx_core_2026", null, null, "미숙아 스키마 · 호흡곤란(급성) 스키마 · 호흡곤란(만성) 스키마", "cpxev:diaphragmatic_hernia"],
+    ["SKKU:M:intrathoracic_visceral_herniation", "manifests_as", "HP:4000214", "cpx_core_2026", "흉부 청진으로 확인", null, "호흡곤란(급성) 스키마 · 호흡곤란(만성) 스키마", "cpxev:diaphragmatic_hernia"],
+
+    ["KCD:U071", "causes", "SKKU:M:sars_cov2_tissue_injury", "cpx_core_2026", null, null, "발열 스키마 · 피로 스키마", "cpxev:covid19"],
+    ["SKKU:M:sars_cov2_tissue_injury", "causes", "SKKU:M:systemic_inflammation", "cpx_core_2026", null, null, "발열 스키마 · 피로 스키마", "cpxev:covid19"],
+    ["SKKU:M:systemic_inflammation", "manifests_as", "SKKU:F:fever", "cpx_core_2026", null, null, "발열 스키마", "cpxev:covid19"],
+    ["SKKU:M:systemic_inflammation", "manifests_as", "SKKU:F:fatigue", "cpx_core_2026", null, null, "피로 스키마", "cpxev:covid19"],
+
+    ["KCD:B181", "causes", "SKKU:M:hbv_immune_liver_injury", "cpx_core_2026", null, null, "황달 스키마", "cpxev:hepatitis_b"],
+    ["SKKU:M:hbv_immune_liver_injury", "causes", "SKKU:M:hepatocellular_injury", "cpx_core_2026", null, null, "황달 스키마", "cpxev:hepatitis_b"]
+  ],
+  "evidence": [
+    ["mi", "D|I21", "급성 심근경색은 대개 죽상경화판 파열·미란과 혈전성 관상동맥 폐색에서 시작해 허혈과 심근세포 괴사로 진행한다.", "Myocardial Infarction, StatPearls", "https://www.ncbi.nlm.nih.gov/books/NBK537076/", "2026-10-13", "independent_model_checked;clinician_pending"],
+    ["transverse_myelitis", "D|G373", "횡단척수염에서는 척수 염증, 탈수초와 축삭 손상이 운동·감각·자율신경 장애를 만든다.", "Transverse Myelitis, StatPearls", "https://www.ncbi.nlm.nih.gov/books/NBK559302/", "2026-10-13", "independent_model_checked;clinician_pending"],
+    ["wernicke", "D|E512", "티아민 결핍은 뇌 에너지 대사를 손상시켜 의식 변화, 운동실조와 안구운동 이상을 일으킬 수 있다.", "Wernicke Encephalopathy, StatPearls", "https://www.ncbi.nlm.nih.gov/books/NBK470344/", "2026-10-13", "independent_model_checked;clinician_pending"],
+    ["ild", "D|J848", "간질성 폐질환은 반복적인 폐포·간질 손상 뒤 염증과 섬유화가 진행해 가스 확산을 방해한다.", "Interstitial Lung Disease, StatPearls", "https://www.ncbi.nlm.nih.gov/books/NBK541084/", "2026-10-13", "independent_model_checked;clinician_pending"],
+    ["av_block", "D|I455", "방실 전도 장애는 서맥과 심박출량 저하를 통해 저혈압·어지럼·실신을 유발할 수 있다.", "Atrioventricular Block, StatPearls", "https://www.ncbi.nlm.nih.gov/books/NBK459147/", "2026-10-13", "independent_model_checked;clinician_pending"],
+    ["peritonitis", "D|K658", "복막 염증은 복벽 경직·방어와 같은 급성 복부 진찰 소견을 만들며 감염 또는 화학 자극 등으로 발생할 수 있다.", "Anatomy, Abdomen and Pelvis, Peritoneum, StatPearls", "https://www.ncbi.nlm.nih.gov/books/NBK534788/", "2026-10-13", "independent_model_checked;clinician_pending"],
+    ["cidp", "D|G618", "면역세포와 항체가 말초신경의 분절성 탈수초를 일으키고 이차 축삭 손상, 근력저하와 반사저하로 이어질 수 있다.", "Chronic Inflammatory Demyelinating Polyradiculoneuropathy, StatPearls", "https://www.ncbi.nlm.nih.gov/books/NBK563249/", "2026-10-13", "independent_model_checked;clinician_pending"],
+    ["narcolepsy", "D|G474", "제1형 발작수면에서는 오렉신 결핍으로 수면-각성 전환이 불안정해지고 REM 현상이 각성기에 침입한다.", "Narcolepsy, StatPearls", "https://www.ncbi.nlm.nih.gov/books/NBK459236/", "2026-10-13", "independent_model_checked;clinician_pending"],
+    ["tin", "D|N12", "세뇨관·간질의 염증과 부종은 신혈류를 방해하고 사구체여과율을 낮출 수 있다.", "Tubulointerstitial Nephritis, StatPearls", "https://www.ncbi.nlm.nih.gov/books/NBK557537/", "2026-10-13", "independent_model_checked;clinician_pending"],
+    ["myocarditis", "D|I40", "심근세포 손상과 면역성 염증은 심근 리모델링과 심실 기능장애로 진행할 수 있다.", "Acute Myocarditis, StatPearls", "https://www.ncbi.nlm.nih.gov/books/NBK441847/", "2026-10-13", "independent_model_checked;clinician_pending"],
+    ["toxic_nodule", "D|E051,D|E052", "독성 결절은 TSH 수용체 경로의 자율성을 얻어 갑상선호르몬을 과다 생성할 수 있다.", "Hyperthyroidism, StatPearls", "https://www.ncbi.nlm.nih.gov/books/NBK537053/", "2026-10-13", "independent_model_checked;clinician_pending"],
+    ["chronic_thyroiditis", "D|E065", "만성 자가면역 갑상선염에서는 림프구와 항체 매개 여포세포 파괴가 진행해 갑상선기능저하로 이어질 수 있다.", "Thyroiditis, StatPearls", "https://www.ncbi.nlm.nih.gov/books/NBK555975/", "2026-10-13", "independent_model_checked;clinician_pending"],
+    ["diaphragmatic_hernia", "D|K44", "횡격막 결손을 통한 복강 장기의 흉강 내 탈출은 폐 압박과 호흡부전을 일으킬 수 있다.", "Diaphragmatic Hernia, StatPearls", "https://www.ncbi.nlm.nih.gov/books/NBK536952/", "2026-10-13", "independent_model_checked;clinician_pending"],
+    ["covid19", "D|U071", "COVID-19은 무증상부터 전신·호흡기 질환까지 다양하며 발열과 피로가 흔한 임상 발현이다.", "Features, Evaluation, and Treatment of Coronavirus, StatPearls", "https://www.ncbi.nlm.nih.gov/books/NBK554776/", "2026-10-13", "independent_model_checked;clinician_pending"],
+    ["hepatitis_b", "D|B181", "만성 B형간염은 지속 감염과 간손상으로 진행할 수 있고 심한 간손상에서는 황달이 나타날 수 있다.", "Hepatitis B, StatPearls", "https://www.ncbi.nlm.nih.gov/books/NBK555945/", "2026-10-13", "independent_model_checked;clinician_pending"]
+  ],
+  "exam_actions": [
+    ["vital_signs", "general", "활력징후 측정", "Measure vital signs", "체온·맥박·혈압·호흡수·산소포화도를 측정한다.", "https://www.ncbi.nlm.nih.gov/books/NBK361/", 10],
+    ["general_inspection", "general", "전신 상태 관찰", "General inspection", "의식, 호흡곤란, 창백, 청색증, 황달과 탈수를 관찰한다.", "https://www.ncbi.nlm.nih.gov/books/NBK361/", 20],
+    ["respiratory_inspection", "respiratory", "호흡 양상·흉곽 관찰", "Inspect breathing and chest", "호흡 노력, 흉곽 대칭과 보조근 사용을 관찰한다.", "https://www.ncbi.nlm.nih.gov/books/NBK368/", 30],
+    ["chest_palpation", "respiratory", "흉곽 촉진", "Palpate the chest", "압통, 흉곽 팽창과 진동 전달의 좌우 차이를 확인한다.", "https://www.ncbi.nlm.nih.gov/books/NBK368/", 31],
+    ["chest_percussion", "respiratory", "흉부 타진", "Percuss the chest", "양측 공명도와 횡격막 위치·운동을 비교한다.", "https://www.ncbi.nlm.nih.gov/books/NBK368/", 32],
+    ["chest_auscultation", "respiratory", "폐 청진", "Auscultate the lungs", "양측 호흡음과 수포음·쌕쌕거림 등 부가음을 비교한다.", "https://www.ncbi.nlm.nih.gov/books/NBK368/", 33],
+    ["pulse_exam", "cardiovascular", "말초 맥박 진찰", "Examine peripheral pulses", "심박수·규칙성·강도와 좌우 대칭을 확인한다.", "https://www.ncbi.nlm.nih.gov/books/NBK361/", 40],
+    ["jvp_exam", "cardiovascular", "경정맥압 진찰", "Assess jugular venous pressure", "우측 경정맥의 압력과 파형을 관찰한다.", "https://www.ncbi.nlm.nih.gov/books/NBK300/", 41],
+    ["cardiac_auscultation", "cardiovascular", "심장 청진", "Auscultate the heart", "심음, 추가 심음과 심잡음을 체계적으로 청진한다.", "https://www.ncbi.nlm.nih.gov/books/NBK361/", 42],
+    ["edema_exam", "cardiovascular", "말초부종 진찰", "Examine peripheral edema", "부위·범위·대칭과 압흔 여부, 피부 변화를 확인한다.", "https://www.ncbi.nlm.nih.gov/books/NBK348/", 43],
+    ["abdominal_inspection", "gastrointestinal", "복부 시진", "Inspect the abdomen", "윤곽·팽만·종괴·흉터와 호흡에 따른 복벽 움직임을 관찰한다.", "https://www.ncbi.nlm.nih.gov/books/NBK420/", 50],
+    ["abdominal_auscultation", "gastrointestinal", "복부 청진", "Auscultate the abdomen", "촉진 전에 장음과 혈관 잡음을 청진한다.", "https://www.ncbi.nlm.nih.gov/books/NBK420/", 51],
+    ["abdominal_percussion", "gastrointestinal", "복부 타진", "Percuss the abdomen", "가스·복수와 간·비장 경계를 평가한다.", "https://www.ncbi.nlm.nih.gov/books/NBK420/", 52],
+    ["abdominal_palpation", "gastrointestinal", "복부 촉진", "Palpate the abdomen", "통증 부위를 마지막에 포함해 압통·방어·경직·종괴·장기비대를 확인한다.", "https://www.ncbi.nlm.nih.gov/books/NBK420/", 53],
+    ["joint_inspection", "musculoskeletal", "관절 시진", "Inspect joints", "발적·부기·변형·비대칭과 근위축을 좌우 비교한다.", "https://www.ncbi.nlm.nih.gov/books/NBK272/", 60],
+    ["joint_palpation", "musculoskeletal", "관절 촉진", "Palpate joints", "압통·열감·활막 비후·삼출과 연부조직 부기를 확인한다.", "https://www.ncbi.nlm.nih.gov/books/NBK272/", 61],
+    ["joint_rom", "musculoskeletal", "관절 가동범위 검사", "Assess joint range of motion", "능동 가동범위를 먼저 보고 필요할 때 수동 범위·통증·염발음을 확인한다.", "https://www.ncbi.nlm.nih.gov/books/NBK272/", 62],
+    ["gait_exam", "neurologic", "보행 검사", "Assess gait", "평상·일자 보행과 자세·균형·통증회피를 관찰한다.", "https://www.ncbi.nlm.nih.gov/books/NBK373/", 70],
+    ["mental_status", "neurologic", "의식·정신상태 검사", "Assess mental status", "의식수준, 지남력, 주의와 기억을 확인한다.", "https://www.ncbi.nlm.nih.gov/books/NBK373/", 71],
+    ["cranial_nerves", "neurologic", "뇌신경 검사", "Examine cranial nerves", "동공·안구운동을 포함해 뇌신경을 체계적으로 검사한다.", "https://www.ncbi.nlm.nih.gov/books/NBK373/", 72],
+    ["motor_exam", "neurologic", "운동계 검사", "Examine motor function", "근위축·근긴장과 상하지 근력을 좌우 비교한다.", "https://www.ncbi.nlm.nih.gov/books/NBK373/", 73],
+    ["sensory_exam", "neurologic", "감각계 검사", "Examine sensation", "통각·촉각·진동·위치감각과 감각 수준을 확인한다.", "https://www.ncbi.nlm.nih.gov/books/NBK373/", 74],
+    ["reflex_exam", "neurologic", "반사 검사", "Examine reflexes", "심부건반사와 병적반사를 좌우 비교한다.", "https://www.ncbi.nlm.nih.gov/books/NBK373/", 75],
+    ["coordination_exam", "neurologic", "협응·소뇌기능 검사", "Assess coordination", "손가락-코, 발꿈치-정강이와 빠른 교대운동을 확인한다.", "https://www.ncbi.nlm.nih.gov/books/NBK373/", 76],
+    ["meningeal_exam", "neurologic", "수막자극징후 검사", "Assess meningeal signs", "목덜미 강직 등 수막자극 소견을 확인한다.", "https://www.ncbi.nlm.nih.gov/books/NBK373/", 77],
+    ["thyroid_exam", "endocrine", "갑상선 시진·촉진", "Inspect and palpate the thyroid", "삼키게 하며 크기·윤곽·비대칭·결절·질감을 보고 만진다.", "https://www.ncbi.nlm.nih.gov/books/NBK244/", 80],
+    ["lymph_node_exam", "hematologic", "림프절 진찰", "Examine lymph nodes", "주요 림프절 군의 위치·크기·압통·경도·유착성을 체계적으로 확인한다.", "https://www.ncbi.nlm.nih.gov/books/NBK256/", 81],
+    ["anthropometry", "growth", "신체계측", "Measure anthropometry", "키·체중을 재고 연령·성별 기준과 시간에 따른 변화를 비교한다.", "https://www.ncbi.nlm.nih.gov/books/NBK335/", 90]
+  ],
+  "exam_action_findings": [
+    ["vital_signs", "F|fever", "체온 상승"],
+    ["vital_signs", "F|hypothermia", "체온 저하"],
+    ["vital_signs", "F|tachycardia", "빈맥"],
+    ["vital_signs", "F|bradycardia", "서맥"],
+    ["vital_signs", "F|hypertension", "혈압 상승"],
+    ["vital_signs", "F|hypotension", "혈압 저하"],
+    ["vital_signs", "H|HP:0002789", "빈호흡"],
+    ["vital_signs", "F|hypoxemia", "산소포화도 저하를 포함한 저산소혈증 단서"],
+    ["general_inspection", "F|altered_consciousness", "의식 변화"],
+    ["general_inspection", "H|HP:0000980", "창백"],
+    ["general_inspection", "H|HP:0000961", "청색증"],
+    ["general_inspection", "F|jaundice", "황달"],
+    ["general_inspection", "F|dehydration", "탈수 징후"],
+    ["respiratory_inspection", "F|respiratory_distress", "호흡 노력 증가"],
+    ["chest_palpation", "F|chest_wall_tenderness", "흉벽 압통"],
+    ["chest_auscultation", "F|rales", "수포음"],
+    ["chest_auscultation", "H|HP:0030828", "쌕쌕거림"],
+    ["chest_auscultation", "H|HP:4000214", "호흡음 감소"],
+    ["pulse_exam", "F|tachycardia", "빠른 맥박"],
+    ["pulse_exam", "F|bradycardia", "느린 맥박"],
+    ["pulse_exam", "H|HP:0032553", "약한 맥박"],
+    ["jvp_exam", "F|jvd", "경정맥압 상승"],
+    ["cardiac_auscultation", "H|HP:0030148", "심잡음"],
+    ["edema_exam", "F|edema", "부종"],
+    ["edema_exam", "F|peripheral_edema", "말초부종"],
+    ["abdominal_inspection", "F|abdominal_distension", "복부팽만"],
+    ["abdominal_auscultation", "H|HP:0030143", "장음 항진"],
+    ["abdominal_auscultation", "H|HP:0030144", "장음 감소"],
+    ["abdominal_auscultation", "H|HP:0030145", "장음 소실"],
+    ["abdominal_palpation", "F|abdominal_mass", "복부 종괴"],
+    ["abdominal_palpation", "H|HP:0032546", "복부 방어"],
+    ["abdominal_palpation", "H|HP:0032545", "복벽 경직"],
+    ["abdominal_palpation", "F|hepatomegaly", "간비대"],
+    ["abdominal_palpation", "F|splenomegaly", "비장비대"],
+    ["joint_inspection", "F|joint_swelling", "관절부기"],
+    ["joint_inspection", "F|erythema_warmth", "발적"],
+    ["joint_palpation", "F|joint_swelling", "활막 비후·삼출을 포함한 부기"],
+    ["joint_palpation", "F|erythema_warmth", "열감"],
+    ["joint_rom", "F|arthralgia", "움직임에 따른 관절통"],
+    ["gait_exam", "F|ataxia", "보행 실조"],
+    ["gait_exam", "H|HP:0001288", "보행 장애"],
+    ["mental_status", "F|altered_consciousness", "의식 변화"],
+    ["mental_status", "F|memory_impairment", "기억력 저하"],
+    ["cranial_nerves", "H|HP:0000639", "안구진탕"],
+    ["motor_exam", "F|muscle_weakness", "근력 약화"],
+    ["motor_exam", "F|limb_weakness", "상하지 근력약화"],
+    ["sensory_exam", "F|paresthesia", "이상감각 분포"],
+    ["sensory_exam", "H|HP:0033748", "감각저하"],
+    ["reflex_exam", "H|HP:0001347", "반사항진"],
+    ["reflex_exam", "H|HP:0001265", "반사저하"],
+    ["reflex_exam", "H|HP:0001284", "반사소실"],
+    ["coordination_exam", "F|ataxia", "협응장애"],
+    ["meningeal_exam", "H|HP:0031179", "목덜미 강직"],
+    ["thyroid_exam", "F|neck_mass", "목덩이"],
+    ["thyroid_exam", "F|thyroid_nodule", "갑상선 결절"],
+    ["thyroid_exam", "H|HP:0000853", "갑상선종"],
+    ["lymph_node_exam", "F|cervical_lymphadenopathy", "경부 림프절병증"],
+    ["lymph_node_exam", "H|HP:0002716", "림프절병증"],
+    ["anthropometry", "F|weight_loss", "체중 감소"],
+    ["anthropometry", "F|weight_gain", "체중 증가"],
+    ["anthropometry", "F|short_stature", "연령 대비 저신장"],
+    ["anthropometry", "H|HP:0001513", "비만"]
+  ]
+}

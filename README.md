@@ -35,6 +35,8 @@ kb.disease("E83.0")["names"]                      # [{'id': 'D|E830@MONDO:001020
 kb.phenotypes("E830@MONDO:0010200")[:5]           # 빈도 높은 순
 kb.reach("E830@MONDO:0010200", direction=1)       # 질병 → 기전 사슬 → 소견
 kb.rank_diseases(["HP:0000952", "HP:0001744"])    # 황달 + 비장비대를 함께 가진 병명
+kb.presentation("vomiting")                       # 구역·구토 → 두 독립 소견
+kb.exams_for_disease("K658")                      # 복막염에서 확인할 진찰 행동 후보
 ```
 
 | 함수 | 하는 일 | 돌려주는 것 |
@@ -47,13 +49,16 @@ kb.rank_diseases(["HP:0000952", "HP:0001744"])    # 황달 + 비장비대를 함
 | `findings_of(disease)` | 질병에서 기전을 거쳐 닿는 소견 (화면 목록의 '소견 N') | 노드 ID 집합 |
 | `causes_of(finding)` | 소견을 일으킬 수 있는 질병·노출 (감별 후보) | `[{id, name, …}]` |
 | `tests_for(finding)` | 소견을 판정하는 검사 (LOINC2HPO) | `[{from(검사), qualifier(결과 H·L·POS…), …}]` |
+| `presentation(id)` | 성대 주호소 원문과 정규화한 증상·부위·시간·맥락 구성요소 | `{…, components: [{expression_ko, normalized_ko, node_id, concept_kind, onset, body_site, context, …}]}` |
+| `exam_actions_for(finding)` | 한 소견을 확인하는 표준 진찰 행동 | `[{id, system, method_ko, finding, interpretation, …}]` |
+| `exams_for_disease(disease)` | 질환에서 닿는 소견을 확인할 표준 진찰 행동 후보 | `[{id, system, method_ko, checks, …}]` — 양성 결과를 미리 단정하지 않음 |
 | `rank_diseases(present, absent=())` | '있음' 소견을 많이 함께 가진 병명 순, '없음'과 어긋나는 수. 하위 HPO 용어(빈맥 → 동성 빈맥)를 가진 병도 맞음으로 셈 | `[{id, name, matched, conflicts, …}]` — **확률이 아니라 공통점** |
 | `table(name)` · `tables()` | DB 표를 dict 로 | 큰 표는 미리보기 300행만 (`total`이 실제 행 수) |
 | `node(id)` | 노드 이름·영어·종류 | `{id, name, en, kind}` |
 
 ## 2. AI 에이전트에 붙이기
 
-`KB.TOOLS`는 함수 6개(search·disease·phenotypes·reach·rank_diseases·tests_for)의 JSON 스키마이고, `kb.call(name, args)`가 실행합니다.
+`KB.TOOLS`는 함수 8개(search·disease·phenotypes·reach·rank_diseases·tests_for·presentation·exams_for_disease)의 JSON 스키마이고, `kb.call(name, args)`가 실행합니다. `exam_actions_for`는 파이썬 API에서 직접 쓸 수 있습니다.
 
 ```python
 import anthropic, json
@@ -76,6 +81,10 @@ OpenAI 호환 API 는 `{"type": "function", "function": {"name": t["name"], "des
 에이전트에게 함께 알려 줄 것:
 - 노드 ID는 `종류|값`입니다 (4절). `search`로 찾은 `id`를 그대로 넘기게 하세요.
 - `rank_diseases`는 겹치는 소견 수일 뿐 진단 확률이 아닙니다.
+- 성균관의대 스키마의 같은 기전 용어가 여러 주호소에 있어도 기본 탐색은 처음 들어간 스키마 문맥을 유지합니다. `감염`·`염증` 같은 공유 기전을 거쳐 다른 주호소 스키마의 소견이 섞이지 않습니다. 원자료 전체 연결을 조사할 때만 `reach(..., schema_scoped=False)` 또는 `findings_of(..., schema_scoped=False)`를 사용하세요.
+- 성대 주호소의 원문 ID와 대표 소견은 호환성을 위해 그대로 둡니다. 복합 표현은 `presentation_component`에서 독립 소견으로 나누고 급성·만성, 부위, 좌우, 중증도, 상황은 수식어로 보존합니다. 세부 원칙은 [`docs/SKKU_NORMALIZATION.md`](docs/SKKU_NORMALIZATION.md)에 있습니다.
+- `exam_action`은 수행할 진찰 행동이고 `finding`은 그 행동으로 확인하는 결과입니다. 질환에 연결됐다는 이유만으로 진찰 결과를 양성으로 간주하지 않습니다.
+- `cpx_core_2026` 기전 연결은 공개 증례 정답을 사용하지 않고 CPX 전체 결손을 기준으로 선택해 교과서 근거를 붙인 보강분입니다. 독립 모델 확인까지 마쳤고 의학과 검수 전입니다. 방법은 [`docs/CPX_DB_METHOD.md`](docs/CPX_DB_METHOD.md)에 있습니다.
 - `source`가 `statpearls_ai`·`medlineplus_ai`인 연결은 StatPearls·MedlinePlus 원문을 AI가 인용과 함께 뽑고 다른 모델이 검토한 것입니다 (검수 전).
 - `ai_or_auto`가 붙은 연결(AI 기전 초안·유전자 자동 연결)과 `name_src: "AI 번역"` · `method: "ai_place"`인 병명은 **의학과 검수 전**입니다.
 
@@ -92,8 +101,8 @@ OpenAI 호환 API 는 `{"type": "function", "function": {"name": t["name"], "des
 
 `version.json` 예:
 ```json
-{"version": "kb-2026.10.07.1", "format": 1, "snapshot": "2026-10-07 20:40", "public": true, "excluded": ["hpoa"],
- "counts": {"kcd_codes": 9626, "disease_names": 2950, "name_phenotype_links": 67709, "kg_edges": 18467, "findings": 292, "mechanisms": 406}}
+{"version": "kb-2026.10.13.1", "format": 1, "snapshot": "2026-10-13 00:00", "public": true, "excluded": ["hpoa"],
+ "base_version": "kb-2026.10.08.2", "counts": {"kcd_codes": 9626, "disease_names": 2950, "name_phenotype_links": 67709, "kg_edges": 68082, "findings": 292, "mechanisms": 426, "presentation_components": 45, "exam_actions": 28}}
 ```
 
 ## 4. 자료 구조 (다른 언어에서 직접 읽기)
@@ -110,7 +119,7 @@ OpenAI 호환 API 는 `{"type": "function", "function": {"name": t["name"], "des
 
 **`window.DB` 주요 키**
 - `tables`: `{표이름: {columns: [{name, type, comment}], rows: [[…]], total, pk, fks, comment, kind}}` — 행은 `columns` 순서의 배열. 큰 표는 미리보기만 (`total`이 실제 수).
-  자주 쓰는 표: `disease`(KCD 코드 15,768 · 3·4자리 9,626), `kcd_entity`(병명 2,950: kcd, mondo_id, name_ko, name_en, name_src, method), `finding`(소견 292), `mechanism`(기전 406), `kcd_ext`(KCD↔MONDO), `entity_phenotype`(열: kcd, mondo_id, hpo_id, finding_id, sources, f_dismech, f_orphadata, f_hpoa, n_ext, min_depth, diagnostic, deny_only).
+  자주 쓰는 표: `disease`(KCD 코드 15,768 · 3·4자리 9,626), `kcd_entity`(병명 2,950: kcd, mondo_id, name_ko, name_en, name_src, method), `finding`(소견 292), `mechanism`(기전 426), `kcd_ext`(KCD↔MONDO), `entity_phenotype`(열: kcd, mondo_id, hpo_id, finding_id, sources, f_dismech, f_orphadata, f_hpoa, n_ext, min_depth, diagnostic, deny_only), `presentation_component`(성대 주호소 세분화), `exam_action`·`exam_action_finding`(진찰 행동과 확인 소견), `cpx_evidence`(보강 근거와 검토 상태).
 - `kg`: 관계 `[출발, 관계, 도착, 출처, qualifier, polarity, 근거(주호소 스키마), 원문 표기]` — 출발·도착은 원본 ID (`KCD:E14`, `SKKU:F:dysuria`, `HP:…`, `LOINC:…`).
 - `dismech`: `{mechs: [[id, MONDO, 영어, 한국어, 단계, 차수, GO, GO방향]], edges: [[기전, 다음기전, HPO]], pheno, mondo2kcd: {MONDO: [[KCD4, MONDO, 깊이]]}, go, labels}`.
 - `loinc`: `{코드: [이름, 한국어, component, property, 검체, 방법, 부하 조건, 분석물]}` · `analyte_ko` · `hpo_labels: {HP: [영어, 한국어]}` · `mondo_labels` · `node_labels` · `sources` · `version` · `format`.
@@ -132,7 +141,7 @@ OpenAI 호환 API 는 `{"type": "function", "function": {"name": t["name"], "des
 
 ## 5. 자료와 이용 조건
 
-KCD(HIRA 상병마스터), 성균관의대 LRC PBL 주호소 스키마(팀 자체 수집), HPO, MONDO, Orphadata, DisMech, LOINC·LOINC2HPO, Gene Ontology를 묶었습니다. 출처별 판과 이용 조건은 화면 오른쪽 위 **DB 정보**에 있습니다.
+KCD(HIRA 상병마스터), 성균관의대 LRC PBL 주호소 스키마(팀 자체 수집), HPO, MONDO, Orphadata, DisMech, LOINC·LOINC2HPO, Gene Ontology를 묶었습니다. CPX 보강 연결과 진찰법은 링크한 NCBI Bookshelf 교과서 자료를 사실 단위로 요약했습니다. 출처별 판과 이용 조건은 화면 오른쪽 위 **DB 정보**에 있습니다.
 
 - 공개판에는 **HPOA(phenotype.hpoa)에서만 온 연결을 넣지 않았습니다** (이용 조건). 그래서 팀 내부판보다 표현형 수가 적습니다.
 - **AI(Claude)** 표시가 붙은 기전·연결·병명 자리·한국어 이름은 AI가 쓰고 다른 AI가 따로 검토한 것으로, **의학과 검수 전**입니다.
@@ -141,3 +150,15 @@ KCD(HIRA 상병마스터), 성균관의대 LRC PBL 주호소 스키마(팀 자�
 ### 올리는 법 (팀)
 
 연구 폴더에서 `bash tools/deploy_public_viewer.sh "바뀐 내용"` — HPOA를 걸러 공개판을 만들고, `gh-pages` 가지에 마지막 판 하나를 올리고, 그 판의 자료를 Release(`kb-YYYY.MM.DD.N`)로 보관합니다.
+
+이 저장소의 `cpx_core_2026` 보강분은 고정한 기초판에 재현 가능하게 적용합니다.
+
+```bash
+python3 tools/build_cpx_release.py \
+  --base ~/.cache/medagent-kb/kb-2026.10.08.2 \
+  --output /tmp/medagent-kb-build/kb-2026.10.13.1
+MEDAGENT_KB_BASE=~/.cache/medagent-kb/kb-2026.10.08.2 \
+  PYTHONPATH=. python3 -m unittest discover -s tests -v
+python3 tools/audit_cpx_coverage.py \
+  --base /tmp/medagent-kb-build/kb-2026.10.13.1
+```
